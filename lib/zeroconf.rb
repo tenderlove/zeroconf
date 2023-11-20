@@ -11,22 +11,9 @@ module ZeroConf
     ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
 
-  DISCOVER_QUERY = [
-    # Query ID
-    0x00, 0x00,
-    # Flags
-    0x00, 0x00,
-    # 1 question
-    0x00, 0x01,
-    # No answer, authority or additional RRs
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # _services._dns-sd._udp.local.
-    0x09, *("_services".bytes), 0x07, *("_dns-sd".bytes), 0x04, *("_udp".bytes), 0x05, *("local".bytes), 0x00,
-    # PTR record
-    0x00, Resolv::DNS::Resource::PTR::TypeValue,
-    # QU (unicast response) and class IN
-    0x80, Resolv::DNS::Resource::IN::ClassValue
-  ].pack('C*')
+  DISCOVER_QUERY = Resolv::DNS::Message.new 0
+  DISCOVER_QUERY.add_question "_services._dns-sd._udp.local", PTR
+
 
   def self.browse *names, interfaces: self.interfaces, timeout: 3, &blk
     # TODO: Fix IPV6
@@ -58,7 +45,7 @@ module ZeroConf
     }
 
     discover_query = DISCOVER_QUERY
-    sockets.each { |socket| multicast_send(socket, discover_query) }
+    sockets.each { |socket| multicast_send(socket, discover_query.encode) }
 
     start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     now = start
