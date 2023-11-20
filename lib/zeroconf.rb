@@ -6,9 +6,27 @@ require "resolv"
 module ZeroConf
   MDNS_UNICAST_RESPONSE = 0x8000
 
-  class Query < Resolv::DNS::Resource::PTR
-    ClassValue = 1 | MDNS_UNICAST_RESPONSE
+  class PTR < Resolv::DNS::Resource::PTR
+    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
+    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
+
+  DISCOVER_QUERY = [
+    # Query ID
+    0x00, 0x00,
+    # Flags
+    0x00, 0x00,
+    # 1 question
+    0x00, 0x01,
+    # No answer, authority or additional RRs
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # _services._dns-sd._udp.local.
+    0x09, *("_services".bytes), 0x07, *("_dns-sd".bytes), 0x04, *("_udp".bytes), 0x05, *("local".bytes), 0x00,
+    # PTR record
+    0x00, Resolv::DNS::Resource::PTR::TypeValue,
+    # QU (unicast response) and class IN
+    0x80, Resolv::DNS::Resource::IN::ClassValue
+  ].pack('C*')
 
   def self.browse *names, interfaces: self.interfaces, timeout: 3, &blk
     # TODO: Fix IPV6
@@ -21,11 +39,42 @@ module ZeroConf
       end
     }
 
-    queries = names.map { |name| Query.new name }
+    queries = names.map { |name| PTR.new name }
 
     send_query queries, sockets, timeout, &blk
   ensure
     sockets.map(&:close)
+  end
+
+  def self.discover interfaces: self.interfaces, timeout: 3
+    port = 0
+
+    sockets = interfaces.select { |ifa| ifa.addr.ipv4? }.map { |iface|
+      if iface.addr.ipv4?
+        open_ipv4 iface.addr, port
+      else
+        open_ipv6 iface.addr, port
+      end
+    }
+
+    discover_query = DISCOVER_QUERY
+    sockets.each { |socket| multicast_send(socket, discover_query) }
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    now = start
+
+    loop do
+      readers, = IO.select(sockets, [], [], timeout - (now - start))
+      return unless readers
+      readers.each do |reader|
+        msg = query_recv reader
+        # only yield replies to this question
+        if msg.question.first.last == PTR
+          yield msg
+        end
+      end
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    end
   end
 
   def self.interfaces
