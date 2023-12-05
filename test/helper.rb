@@ -1,7 +1,9 @@
-require "tldr"
+ENV["MT_NO_PLUGINS"] = "1"
+
+require "minitest/autorun"
 require "zeroconf"
 
 module ZeroConf
-  class Test < TLDR
+  class Test < Minitest::Test
   end
 end

@@ -3,11 +3,11 @@
 module ZeroConf
   class Service
     attr_reader :service, :service_port, :hostname, :service_interfaces,
-      :service_name, :qualified_host
+      :service_name, :qualified_host, :text
 
     MDNS_NAME = "_services._dns-sd._udp.local."
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: nil
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""]
       @service = service
       @service_port = service_port
       @hostname = hostname
@@ -15,6 +15,7 @@ module ZeroConf
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
       @text = text
+      @rd, @wr = IO.pipe
     end
 
     def announcement
@@ -131,34 +132,6 @@ module ZeroConf
       msg
     end
 
-    def service_instance_unicast_answer
-      msg = Resolv::DNS::Message.new(0)
-      msg.qr = 1
-      msg.aa = 1
-
-      service_interfaces.each do |iface|
-        if iface.addr.ipv4?
-          msg.add_additional qualified_host,
-            10,
-            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
-        else
-          msg.add_additional qualified_host,
-            10,
-            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
-        end
-      end
-
-      if @text
-        msg.add_additional service_name,
-          10,
-          Resolv::DNS::Resource::IN::TXT.new(*@text)
-      end
-      msg.add_answer service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
-      msg.add_question service_name, ZeroConf::MDNS::Announce::IN::SRV
-
-      msg
-    end
-
     def service_instance_multicast_answer
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
@@ -188,21 +161,28 @@ module ZeroConf
 
     include Utils
 
+    def stop
+      @wr.write "x"
+      @wr.close
+    end
+
     def start
       sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port
-
-      sockets = [sock]
 
       msg = announcement
 
       # announce
-      sockets.each { |sock| multicast_send(sock, msg.encode) }
+      multicast_send(sock, msg.encode)
+
+      sockets = [sock, @rd]
 
       loop do
         readers, = IO.select(sockets, [], [])
         next unless readers
 
         readers.each do |reader|
+          return if reader == @rd
+
           buf, from = reader.recvfrom 2048
           msg = Resolv::DNS::Message.decode(buf)
 
@@ -242,7 +222,6 @@ module ZeroConf
                 service_multicast_answer
               end
             elsif qn == "tc-lan-adapter._test-mdns._tcp.local"
-              p type
               puts "service answer #{unicast ? "unicast" : "multicast"}"
 
               if unicast
@@ -272,6 +251,36 @@ module ZeroConf
       end
     ensure
       sockets.map(&:close)
+    end
+
+    private
+
+    def service_instance_unicast_answer
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          10,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+      msg.add_answer service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
+      msg.add_question service_name, ZeroConf::MDNS::Announce::IN::SRV
+
+      msg
     end
   end
 end
