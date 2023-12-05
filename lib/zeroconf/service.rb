@@ -98,40 +98,6 @@ module ZeroConf
       msg
     end
 
-    def service_unicast_answer
-      msg = Resolv::DNS::Message.new(0)
-      msg.qr = 1
-      msg.aa = 1
-
-      msg.add_additional service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
-
-      service_interfaces.each do |iface|
-        if iface.addr.ipv4?
-          msg.add_additional qualified_host,
-            10,
-            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
-        else
-          msg.add_additional qualified_host,
-            10,
-            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
-        end
-      end
-
-      if @text
-        msg.add_additional service_name,
-          10,
-          Resolv::DNS::Resource::IN::TXT.new(*@text)
-      end
-
-      msg.add_answer service,
-        10,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
-
-      msg.add_question service, ZeroConf::PTR
-
-      msg
-    end
-
     def service_instance_multicast_answer
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
@@ -217,6 +183,7 @@ module ZeroConf
               puts "service answer #{unicast ? "unicast" : "multicast"}"
 
               if unicast
+                pp type
                 service_unicast_answer
               else
                 service_multicast_answer
@@ -279,6 +246,40 @@ module ZeroConf
       end
       msg.add_answer service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
       msg.add_question service_name, ZeroConf::MDNS::Announce::IN::SRV
+
+      msg
+    end
+
+    def service_unicast_answer
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
+
+      service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          10,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg.add_answer service,
+        10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      msg.add_question service, ZeroConf::PTR
 
       msg
     end
