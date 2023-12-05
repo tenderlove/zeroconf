@@ -44,18 +44,6 @@ module ZeroConf
       msg
     end
 
-    def dnssd_unicast_answer
-      msg = Resolv::DNS::Message.new(0)
-      msg.qr = 1
-      msg.aa = 1
-
-      msg.add_answer MDNS_NAME, 10,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
-
-      msg.add_question MDNS_NAME, ZeroConf::PTR
-      msg
-    end
-
     def dnssd_multicast_answer
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
@@ -135,12 +123,12 @@ module ZeroConf
     def start
       sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port
 
+      sockets = [sock, @rd]
+
       msg = announcement
 
       # announce
       multicast_send(sock, msg.encode)
-
-      sockets = [sock, @rd]
 
       loop do
         readers, = IO.select(sockets, [], [])
@@ -281,6 +269,18 @@ module ZeroConf
 
       msg.add_question service, ZeroConf::PTR
 
+      msg
+    end
+
+    def dnssd_unicast_answer
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_answer MDNS_NAME, 10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
+
+      msg.add_question MDNS_NAME, ZeroConf::PTR
       msg
     end
   end

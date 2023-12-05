@@ -65,10 +65,43 @@ module ZeroConf
     end
 
     def test_dnssd_unicast_answer
-      unicast_answer = "\x00\x00\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\t_services\a_dns-sd\x04_udp\x05local\x00\x00\f\x80\x01\xC0\f\x00\f\x00\x01\x00\x00\x00\n\x00\x12\n_test-mdns\x04_tcp\xC0#".b
-      msg = Resolv::DNS::Message.decode unicast_answer
-      service = Service.new "_test-mdns._tcp.local.", 42424, "tc-lan-adapter"
-      assert_equal msg.encode, service.dnssd_unicast_answer.encode
+      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
+
+      s = Service.new "_test-mdns._tcp.local.",
+        42424,
+        "tc-lan-adapter",
+        service_interfaces: [iface], text: ["test=1", "other=value"]
+
+      runner = Thread.new { s.start }
+
+      query = Resolv::DNS::Message.new 0
+      query.add_question "_services._dns-sd._udp.local.", ZeroConf::PTR
+
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+
+      res = nil
+      loop do
+        buf, from = sock.recvfrom(2048)
+        res = Resolv::DNS::Message.decode buf
+        if from.last == iface.addr.ip_address
+          break if res.answer.find { |name, ttl, data| data.name.to_s == "_test-mdns._tcp.local" }
+        end
+      end
+
+      s.stop
+      runner.join
+
+      expected = Resolv::DNS::Message.new(0)
+      expected.qr = 1
+      expected.aa = 1
+
+      expected.add_answer ZeroConf::Service::MDNS_NAME, 10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
+
+      expected.add_question ZeroConf::Service::MDNS_NAME, ZeroConf::PTR
+
+      assert_equal expected, res
     end
 
     def test_dnssd_multicast_answer
