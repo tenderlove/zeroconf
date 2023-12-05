@@ -4,6 +4,9 @@ module ZeroConf
   class Service
     attr_reader :service, :service_port, :hostname, :service_interfaces,
       :service_name, :qualified_host
+
+    MDNS_NAME = "_services._dns-sd._udp.local."
+
     def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: nil
       @service = service
       @service_port = service_port
@@ -33,10 +36,6 @@ module ZeroConf
         end
       end
 
-      #msg.add_additional qualified_host,
-      #  60,
-      #  ZeroConf::MDNS::Announce::IN::TXT.new("test=1", "other=value")
-
       msg.add_answer service,
         60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
@@ -49,13 +48,10 @@ module ZeroConf
       msg.qr = 1
       msg.aa = 1
 
-      msg.add_answer "_services._dns-sd._udp.local.", 10,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create("_test-mdns._tcp.local."))
+      msg.add_answer MDNS_NAME, 10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
 
-      msg.add_question "_services._dns-sd._udp.local.", ZeroConf::PTR
-      #msg.add_additional qualified_host,
-      #  60,
-      #  ZeroConf::MDNS::Announce::IN::TXT.new("test=1", "other=value")
+      msg.add_question MDNS_NAME, ZeroConf::PTR
       msg
     end
 
@@ -64,11 +60,8 @@ module ZeroConf
       msg.qr = 1
       msg.aa = 1
 
-      msg.add_answer "_services._dns-sd._udp.local.", 60,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create("_test-mdns._tcp.local."))
-      #msg.add_additional qualified_host,
-      #  60,
-      #  ZeroConf::MDNS::Announce::IN::TXT.new("test=1", "other=value")
+      msg.add_answer MDNS_NAME, 60,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
       msg
     end
 
@@ -279,10 +272,6 @@ module ZeroConf
       end
     ensure
       sockets.map(&:close)
-    end
-
-    def unicast_send sock, data, to
-      sock.send(data, 0, Addrinfo.new(to))
     end
   end
 end

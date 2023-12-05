@@ -6,11 +6,18 @@ require "zeroconf/service"
 module ZeroConf
   MDNS_CACHE_FLUSH = 0x8000
 
-  class PTR < Resolv::DNS::Resource::PTR
+  class PTR < Resolv::DNS::Resource::IN::PTR
     MDNS_UNICAST_RESPONSE = 0x8000
 
     ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
     ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
+  end
+
+  class ANY < Resolv::DNS::Resource::IN::ANY
+    MDNS_UNICAST_RESPONSE = 0x8000
+
+    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
+    ::Resolv::DNS::Resource::ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
 
   class A < Resolv::DNS::Resource::IN::A
@@ -79,43 +86,10 @@ module ZeroConf
     sockets.map(&:close) if sockets
   end
 
-  def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: nil
+  def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: [""]
     s = Service.new(service, service_port, hostname, service_interfaces:, text:)
 
     s.start
-  end
-
-  def self.srv interfaces: self.interfaces, timeout: 3
-    query = Resolv::DNS::Message.new 0
-    #query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
-    query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::SRV
-    #query.add_question "_test-mdns._tcp.local.", PTR
-
-    port = 0
-
-    sockets = interfaces.map { |iface|
-      if iface.addr.ipv4?
-        open_ipv4 iface.addr, port
-      else
-        open_ipv6 iface.addr, port
-      end
-    }.compact
-
-    discover_query = query
-    sockets.each { |socket| multicast_send(socket, discover_query.encode) }
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    now = start
-
-    loop do
-      readers, = IO.select(sockets, [], [], timeout && (timeout - (now - start)))
-      return unless readers
-      readers.each do |reader|
-        msg = query_recv reader
-        pp msg
-      end
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
   end
 
   def self.discover interfaces: self.interfaces, timeout: 3
@@ -143,10 +117,7 @@ module ZeroConf
         msg = Resolv::DNS::Message.decode(buf)
         # only yield replies to this question
         if msg.question.length > 0 && msg.question.first.last == PTR
-          if msg.answer.map(&:last).map(&:name).map(&:to_s).first == "_test-mdns._tcp.local"
-            p buf
-          end
-          #yield msg
+          yield msg
         end
       end
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -190,25 +161,6 @@ module ZeroConf
 
   extend Utils
 
-  private_class_method def self.open_ipv6 saddr, port
-    sock = UDPSocket.new Socket::AF_INET6
-    sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
-    sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
-    sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_MULTICAST_HOPS, true)
-    sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_MULTICAST_LOOP, true)
-    setup_ipv6 sock, saddr, port
-    sock
-  rescue SystemCallError
-  end
-
-  private_class_method def self.setup_ipv6 sock, saddr, port
-    s = IPAddr.new("ff02:0000:0000:0000:0000:00fb:0000:0000").hton
-    sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_JOIN_GROUP, s)
-    sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_MULTICAST_IF, IPAddr.new(saddr.ip_address).hton)
-    sock.bind saddr.ip_address, port
-    flags = sock.fcntl(Fcntl::F_GETFL, 0)
-    sock.fcntl(Fcntl::F_SETFL, Fcntl::O_NONBLOCK | flags)
-  end
 
   private_class_method def self.multiquery_send sock, queries, query_id
     query = Resolv::DNS::Message.new query_id
@@ -216,10 +168,6 @@ module ZeroConf
     queries.each { |q| query.add_question q.name, q.class }
 
     multicast_send sock, query.encode
-  end
-
-  private_class_method def self.unicast_send sock, addr, msg
-    sock.send(msg, 0, addr)
   end
 
   private_class_method def self.query_recv sock
