@@ -4,9 +4,14 @@ module ZeroConf
   class ServiceTest < Test
     include ZeroConf::Utils
 
-    def test_service_info
-      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
+    attr_reader :iface
 
+    def setup
+      super
+      @iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
+    end
+
+    def test_service_info
       s = Service.new "_test-mdns._tcp.local.",
         42424,
         "tc-lan-adapter",
@@ -22,13 +27,7 @@ module ZeroConf
     end
 
     def test_unicast_service_instance_answer
-      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
-
-      s = Service.new "_test-mdns._tcp.local.",
-        42424,
-        "tc-lan-adapter",
-        service_interfaces: [iface], text: ["test=1", "other=value"]
-
+      s = make_server iface
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
@@ -58,8 +57,6 @@ module ZeroConf
     end
 
     def test_multicast_discover
-      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
-
       q = Queue.new
       rd, wr = IO.pipe
 
@@ -102,13 +99,7 @@ module ZeroConf
     end
 
     def test_dnssd_unicast_answer
-      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
-
-      s = Service.new "_test-mdns._tcp.local.",
-        42424,
-        "tc-lan-adapter",
-        service_interfaces: [iface], text: ["test=1", "other=value"]
-
+      s = make_server iface
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
@@ -149,13 +140,7 @@ module ZeroConf
     end
 
     def test_service_unicast_answer
-      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
-
-      s = Service.new "_test-mdns._tcp.local.",
-        42424,
-        "tc-lan-adapter",
-        service_interfaces: [iface], text: ["test=1", "other=value"]
-
+      s = make_server iface
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
