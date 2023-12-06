@@ -57,6 +57,43 @@ module ZeroConf
       assert_equal expected, res
     end
 
+    def test_multicast_discover
+      iface = ZeroConf.interfaces.find_all { |x| x.addr.ipv4? }.first
+
+      q = Queue.new
+      rd, wr = IO.pipe
+
+      listen = make_listener rd, q
+      s = make_server iface
+      server = Thread.new { s.start }
+
+      query = Resolv::DNS::Message.new 0
+      query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+
+      while res = q.pop
+        if res.answer.find { |name, ttl, data| name.to_s == "_services._dns-sd._udp.local" && data.name.to_s == "_test-mdns._tcp.local" }
+          wr.write "x"
+          break
+        end
+      end
+
+      listen.join
+      s.stop
+      server.join
+
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_answer DISCOVERY_NAME, 60,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
+      msg
+
+      assert_equal msg, res
+    end
+
     def test_announcement
       ann = "\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x03\n_test-mdns\x04_tcp\x05local\x00\x00\f\x00\x01\x00\x00\x00<\x00\x15\x0Etc-lan-adapter\x03lan\xC0\f\xC0-\x00!\x80\x01\x00\x00\x00<\x00 \x00\x00\x00\x00\xA5\xB8\x0Etc-lan-adapter\x03lan\x05local\x00\xC0T\x00\x01\x80\x01\x00\x00\x00<\x00\x04\n\x00\x01\x95\xC0T\x00\x1C\x80\x01\x00\x00\x00<\x00\x10\xFD\xDA\x85k\tL\x00\x00\x10\xF6\x892\xEA\xBB\\H".b
       msg = Resolv::DNS::Message.decode ann
@@ -102,13 +139,6 @@ module ZeroConf
       expected.add_question ZeroConf::Service::MDNS_NAME, ZeroConf::PTR
 
       assert_equal expected, res
-    end
-
-    def test_dnssd_multicast_answer
-      multicast_answer = "\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x00\x09\x5f\x73\x65\x72\x76\x69\x63\x65\x73\x07\x5f\x64\x6e\x73\x2d\x73\x64\x04\x5f\x75\x64\x70\x05\x6c\x6f\x63\x61\x6c\x00\x00\x0c\x00\x01\x00\x00\x00\x3c\x00\x12\x0a\x5f\x74\x65\x73\x74\x2d\x6d\x64\x6e\x73\x04\x5f\x74\x63\x70\xc0\x23"
-      msg = Resolv::DNS::Message.decode multicast_answer
-      service = Service.new "_test-mdns._tcp.local.", 42424, "tc-lan-adapter"
-      assert_equal msg.encode, service.dnssd_multicast_answer.encode
     end
 
     def test_service_multicast_answer

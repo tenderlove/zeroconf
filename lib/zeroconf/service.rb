@@ -44,16 +44,6 @@ module ZeroConf
       msg
     end
 
-    def dnssd_multicast_answer
-      msg = Resolv::DNS::Message.new(0)
-      msg.qr = 1
-      msg.aa = 1
-
-      msg.add_answer MDNS_NAME, 60,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
-      msg
-    end
-
     def service_multicast_answer
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
@@ -281,6 +271,16 @@ module ZeroConf
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
 
       msg.add_question MDNS_NAME, ZeroConf::PTR
+      msg
+    end
+
+    def dnssd_multicast_answer
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_answer MDNS_NAME, 60,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
       msg
     end
   end

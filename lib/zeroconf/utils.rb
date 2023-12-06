@@ -7,6 +7,8 @@ require "resolv"
 
 module ZeroConf
   module Utils
+    DISCOVERY_NAME = "_services._dns-sd._udp.local."
+
     def open_ipv4 saddr, port
       sock = UDPSocket.new Socket::AF_INET
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
