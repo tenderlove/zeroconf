@@ -84,14 +84,11 @@ module ZeroConf
             break unless class_type == 1 || class_type == 255
 
             unicast = type::ClassValue & PTR::MDNS_UNICAST_RESPONSE > 0
-            puts "Query %s %s" % [type.name.split("::").last, name]
 
             qn = name.to_s
 
             res = if qn == "_services._dns-sd._udp.local"
               break if has_flags
-
-              puts "dnssd answer #{unicast ? "unicast" : "multicast"}"
 
               if unicast
                 dnssd_unicast_answer
@@ -99,24 +96,18 @@ module ZeroConf
                 dnssd_multicast_answer
               end
             elsif qn == "_test-mdns._tcp.local"
-              puts "service answer #{unicast ? "unicast" : "multicast"}"
-
               if unicast
-                pp type
                 service_unicast_answer
               else
                 service_multicast_answer
               end
             elsif qn == "tc-lan-adapter._test-mdns._tcp.local"
-              puts "service answer #{unicast ? "unicast" : "multicast"}"
-
               if unicast
                 service_instance_unicast_answer
               else
                 service_instance_multicast_answer
               end
             elsif qn == "tc-lan-adapter.local"
-              p "HOSTNAME"
               raise NotImplementedError
             else
               #p [:QUERY2, type, type::ClassValue, name]
