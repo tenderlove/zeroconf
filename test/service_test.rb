@@ -253,5 +253,74 @@ module ZeroConf
 
       assert_equal msg, res
     end
+
+    def test_unicast_name_lookup
+      s = make_server iface
+      runner = Thread.new { s.start }
+
+      query = Resolv::DNS::Message.new 0
+      query.add_question "tc-lan-adapter.local.", ZeroConf::A
+
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+      res = Resolv::DNS::Message.decode sock.recvfrom(2048).first
+      s.stop
+      runner.join
+
+      expected = Resolv::DNS::Message.new(0)
+      expected.qr = 1
+      expected.aa = 1
+
+      expected.add_answer s.qualified_host, 10, Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+
+      expected.add_additional s.service_name,
+        10,
+        Resolv::DNS::Resource::IN::TXT.new(*s.text)
+
+      expected.add_question s.qualified_host,
+        ZeroConf::MDNS::Announce::IN::A
+
+      assert_equal expected, res
+    end
+
+    def test_multicast_name
+      q = Queue.new
+      rd, wr = IO.pipe
+
+      listen = make_listener rd, q
+      s = make_server iface
+      server = Thread.new { s.start }
+
+      query = Resolv::DNS::Message.new 0
+      query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+
+      service = Resolv::DNS::Name.create s.service
+      host = Resolv::DNS::Name.create s.qualified_host
+
+      while res = q.pop
+        if res.answer.find { |name, ttl, data| name == host }
+          wr.write "x"
+          break
+        end
+      end
+
+      listen.join
+      s.stop
+      server.join
+
+      expected = Resolv::DNS::Message.new(0)
+      expected.qr = 1
+      expected.aa = 1
+
+      expected.add_answer s.qualified_host, 60, Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+
+      expected.add_additional s.service_name,
+        60,
+        Resolv::DNS::Resource::IN::TXT.new(*s.text)
+
+      assert_equal expected, res
+    end
   end
 end

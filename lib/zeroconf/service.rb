@@ -71,12 +71,7 @@ module ZeroConf
           buf, from = reader.recvfrom 2048
           msg = Resolv::DNS::Message.decode(buf)
 
-          # Ignore discovery queries
-          #if msg == DISCOVER_QUERY
-          #  p "GOT DNS SD"
-          #  next
-          #end
-          has_flags = msg.qr > 0 || msg.opcode > 0 || msg.aa > 0 || msg.tc > 0 || msg.rd > 0 || msg.ra > 0 || msg.rcode > 0
+          has_flags = (buf.getbyte(3) << 8 | buf.getbyte(2)) != 0
 
           msg.question.each do |name, type|
             class_type = type::ClassValue & ~MDNS_CACHE_FLUSH
@@ -85,9 +80,10 @@ module ZeroConf
 
             unicast = type::ClassValue & PTR::MDNS_UNICAST_RESPONSE > 0
 
-            qn = name.to_s
+            qn = name.to_s + "."
 
-            res = if qn == "_services._dns-sd._udp.local"
+            res = case qn
+            when DISCOVERY_NAME
               break if has_flags
 
               if unicast
@@ -95,20 +91,24 @@ module ZeroConf
               else
                 dnssd_multicast_answer
               end
-            elsif qn == "_test-mdns._tcp.local"
+            when service
               if unicast
                 service_unicast_answer
               else
                 service_multicast_answer
               end
-            elsif qn == "tc-lan-adapter._test-mdns._tcp.local"
+            when service_name
               if unicast
                 service_instance_unicast_answer
               else
                 service_instance_multicast_answer
               end
-            elsif qn == "tc-lan-adapter.local"
-              raise NotImplementedError
+            when qualified_host
+              if unicast
+                name_answer_unicast
+              else
+                name_answer_multicast
+              end
             else
               #p [:QUERY2, type, type::ClassValue, name]
             end
@@ -116,7 +116,6 @@ module ZeroConf
             next unless res
 
             if unicast
-              #unicast_send reader, res.encode, Addrinfo.new(from)
               unicast_send reader, res.encode, from
             else
               multicast_send reader, res.encode
@@ -264,6 +263,94 @@ module ZeroConf
           msg.add_additional qualified_host,
             60,
             Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          60,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg
+    end
+
+    def name_answer_unicast
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      a_iface = service_interfaces.first
+
+      first = true
+
+      service_interfaces.each do |iface|
+        if first
+          if iface.addr.ipv4?
+            msg.add_answer qualified_host,
+              10,
+              Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+          else
+            msg.add_answer s.qualified_host,
+              10,
+              Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+          end
+          first = false
+        else
+          if iface.addr.ipv4?
+            msg.add_additional qualified_host,
+              10,
+              Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+          else
+            msg.add_additional qualified_host,
+              10,
+              Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+          end
+        end
+      end
+
+      msg.add_question qualified_host, ZeroConf::MDNS::Announce::IN::A
+
+      if @text
+        msg.add_additional service_name,
+          10,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg
+    end
+
+    def name_answer_multicast
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      a_iface = service_interfaces.first
+
+      first = true
+
+      service_interfaces.each do |iface|
+        if first
+          if iface.addr.ipv4?
+            msg.add_answer qualified_host,
+              60,
+              Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+          else
+            msg.add_answer s.qualified_host,
+              60,
+              Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+          end
+          first = false
+        else
+          if iface.addr.ipv4?
+            msg.add_additional qualified_host,
+              60,
+              Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+          else
+            msg.add_additional qualified_host,
+              60,
+              Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+          end
         end
       end
 
