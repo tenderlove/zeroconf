@@ -278,8 +278,6 @@ module ZeroConf
       msg.qr = 1
       msg.aa = 1
 
-      a_iface = service_interfaces.first
-
       first = true
 
       service_interfaces.each do |iface|
@@ -322,8 +320,6 @@ module ZeroConf
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
-
-      a_iface = service_interfaces.first
 
       first = true
 

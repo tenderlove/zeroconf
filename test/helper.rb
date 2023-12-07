@@ -5,8 +5,16 @@ require "zeroconf"
 
 module ZeroConf
   class Test < Minitest::Test
+    SERVICE_NAME = "_test-mdns._tcp.local"
+
+    def time_it
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      yield
+      Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+    end
+
     def make_server iface
-      s = Service.new "_test-mdns._tcp.local.",
+      s = Service.new SERVICE_NAME + ".",
         42424,
         "tc-lan-adapter",
         service_interfaces: [iface], text: ["test=1", "other=value"]

@@ -6,6 +6,10 @@ require "zeroconf/service"
 module ZeroConf
   MDNS_CACHE_FLUSH = 0x8000
 
+  extend Utils
+  include Utils
+
+  # :stopdoc:
   class PTR < Resolv::DNS::Resource::IN::PTR
     MDNS_UNICAST_RESPONSE = 0x8000
 
@@ -47,8 +51,10 @@ module ZeroConf
     end
   end
 
+  # :startdoc:
+
   DISCOVER_QUERY = Resolv::DNS::Message.new 0
-  DISCOVER_QUERY.add_question "_services._dns-sd._udp.local.", PTR
+  DISCOVER_QUERY.add_question DISCOVERY_NAME, PTR
 
   def self.browse *names, interfaces: self.interfaces, timeout: 3, &blk
     # TODO: Fix IPV6
@@ -113,15 +119,19 @@ module ZeroConf
       readers, = IO.select(sockets, [], [], timeout && (timeout - (now - start)))
       return unless readers
       readers.each do |reader|
-        buf, from = reader.recvfrom 2048
+        buf, _ = reader.recvfrom 2048
         msg = Resolv::DNS::Message.decode(buf)
         # only yield replies to this question
         if msg.question.length > 0 && msg.question.first.last == PTR
-          yield msg
+          if :done == yield(msg)
+            return msg
+          end
         end
       end
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
+  ensure
+    sockets.each(&:close) if sockets
   end
 
   def self.interfaces
@@ -153,14 +163,12 @@ module ZeroConf
       readers, = IO.select(sockets, [], [], timeout - (now - start))
       return unless readers
       readers.each do |reader|
-        yield query_recv(reader)
+        buf, = sock.recvfrom 2048
+        yield Resolv::DNS::Message.decode(buf)
       end
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
-
-  extend Utils
-
 
   private_class_method def self.multiquery_send sock, queries, query_id
     query = Resolv::DNS::Message.new query_id
@@ -168,10 +176,5 @@ module ZeroConf
     queries.each { |q| query.add_question q.name, q.class }
 
     multicast_send sock, query.encode
-  end
-
-  private_class_method def self.query_recv sock
-    buf, = sock.recvfrom 2048
-    Resolv::DNS::Message.decode(buf)
   end
 end
