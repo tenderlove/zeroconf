@@ -124,10 +124,10 @@ module ZeroConf
       expected.qr = 1
       expected.aa = 1
 
-      expected.add_answer ZeroConf::Service::MDNS_NAME, 10,
+      expected.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
 
-      expected.add_question ZeroConf::Service::MDNS_NAME, ZeroConf::PTR
+      expected.add_question DISCOVERY_NAME, ZeroConf::PTR
 
       assert_equal expected, res
     end

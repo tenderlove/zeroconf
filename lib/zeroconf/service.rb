@@ -5,8 +5,6 @@ module ZeroConf
     attr_reader :service, :service_port, :hostname, :service_interfaces,
       :service_name, :qualified_host, :text
 
-    MDNS_NAME = "_services._dns-sd._udp.local."
-
     def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""]
       @service = service
       @service_port = service_port
@@ -198,10 +196,10 @@ module ZeroConf
       msg.qr = 1
       msg.aa = 1
 
-      msg.add_answer MDNS_NAME, 10,
+      msg.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
 
-      msg.add_question MDNS_NAME, ZeroConf::PTR
+      msg.add_question DISCOVERY_NAME, ZeroConf::PTR
       msg
     end
 
@@ -210,7 +208,7 @@ module ZeroConf
       msg.qr = 1
       msg.aa = 1
 
-      msg.add_answer MDNS_NAME, 60,
+      msg.add_answer DISCOVERY_NAME, 60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
       msg
     end
