@@ -57,7 +57,6 @@ module ZeroConf
   DISCOVER_QUERY.add_question DISCOVERY_NAME, PTR
 
   def self.browse *names, interfaces: self.interfaces, timeout: 3, &blk
-    # TODO: Fix IPV6
     port = 0
     sockets = interfaces.map { |iface|
       if iface.addr.ipv4?
@@ -94,7 +93,6 @@ module ZeroConf
 
   def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: [""]
     s = Service.new(service, service_port, hostname, service_interfaces:, text:)
-
     s.start
   end
 
@@ -163,8 +161,9 @@ module ZeroConf
       readers, = IO.select(sockets, [], [], timeout - (now - start))
       return unless readers
       readers.each do |reader|
-        buf, = sock.recvfrom 2048
-        yield Resolv::DNS::Message.decode(buf)
+        buf, = reader.recvfrom 2048
+        msg = Resolv::DNS::Message.decode(buf)
+        return msg if :done == yield(msg)
       end
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end

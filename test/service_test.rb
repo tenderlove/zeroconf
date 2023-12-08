@@ -70,7 +70,7 @@ module ZeroConf
       multicast_send sock, query.encode
 
       while res = q.pop
-        if res.answer.find { |name, ttl, data| name.to_s == "_services._dns-sd._udp.local" && data.name.to_s == "_test-mdns._tcp.local" }
+        if res.answer.find { |name, ttl, data| name.to_s == "_services._dns-sd._udp.local" && data.name.to_s == SERVICE }
           wr.write "x"
           break
         end
@@ -86,7 +86,6 @@ module ZeroConf
 
       msg.add_answer DISCOVERY_NAME, 60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
-      msg
 
       assert_equal msg, res
     end
@@ -113,7 +112,7 @@ module ZeroConf
         buf, from = sock.recvfrom(2048)
         res = Resolv::DNS::Message.decode buf
         if from.last == iface.addr.ip_address
-          break if res.answer.find { |name, ttl, data| data.name.to_s == "_test-mdns._tcp.local" }
+          break if res.answer.find { |name, ttl, data| data.name.to_s == SERVICE }
         end
       end
 
@@ -222,7 +221,6 @@ module ZeroConf
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
-      service = Resolv::DNS::Name.create s.service
       service_name = Resolv::DNS::Name.create s.service_name
 
       while res = q.pop
@@ -296,7 +294,6 @@ module ZeroConf
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
-      service = Resolv::DNS::Name.create s.service
       host = Resolv::DNS::Name.create s.qualified_host
 
       while res = q.pop
