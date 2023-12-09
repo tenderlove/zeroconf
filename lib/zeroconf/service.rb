@@ -35,6 +35,12 @@ module ZeroConf
         end
       end
 
+      if @text
+        msg.add_additional service_name,
+          60,
+          MDNS::Announce::IN::TXT.new(*@text)
+      end
+
       msg.add_answer service,
         60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
