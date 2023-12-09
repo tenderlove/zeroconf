@@ -42,6 +42,38 @@ module ZeroConf
       msg
     end
 
+    def disconnect_msg
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional service_name, 0, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
+
+      service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional qualified_host,
+            0,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional qualified_host,
+            0,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          0,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg.add_answer service,
+        0,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      msg
+    end
+
     include Utils
 
     def stop
@@ -124,6 +156,7 @@ module ZeroConf
         end
       end
     ensure
+      multicast_send sock, disconnect_msg.encode
       sockets.map(&:close)
     end
 
