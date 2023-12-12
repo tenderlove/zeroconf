@@ -73,8 +73,7 @@ module ZeroConf
     sockets.map(&:close) if sockets
   end
 
-  def self.lookup *names, interfaces: self.interfaces, timeout: 3, &blk
-    # TODO: Fix IPV6
+  def self.resolve name, interfaces: self.interfaces, timeout: 3, &blk
     port = 0
     sockets = interfaces.map { |iface|
       if iface.addr.ipv4?
@@ -84,9 +83,26 @@ module ZeroConf
       end
     }.compact
 
-    queries = names.map { |name| A.new name }
+    query = Resolv::DNS::Message.new 0
+    query.add_question Resolv::DNS::Name.create(name), A
 
-    send_query queries, sockets, timeout, &blk
+    sockets.each do |sock|
+      multicast_send sock, query.encode
+    end
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    now = start
+
+    loop do
+      readers, = IO.select(sockets, [], [], timeout - (now - start))
+      return unless readers
+      readers.each do |reader|
+        buf, = reader.recvfrom 2048
+        msg = Resolv::DNS::Message.decode(buf)
+        return msg if :done == yield(msg)
+      end
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    end
   ensure
     sockets.map(&:close) if sockets
   end
