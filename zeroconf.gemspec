@@ -12,6 +12,7 @@ Gem::Specification.new do |s|
   s.homepage    = "https://github.com/tenderlove/zeroconf"
   s.license     = "Apache-2.0"
 
+  s.add_dependency("resolv", "~> 0.3.0")
   s.add_development_dependency("rake", "~> 13.0")
-  s.add_development_dependency("tldr", "~> 0.6.2")
+  s.add_development_dependency("minitest", "~> 5.20")
 end
