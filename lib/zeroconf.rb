@@ -51,12 +51,27 @@ module ZeroConf
     end
   end
 
-  # :startdoc:
-
   DISCOVER_QUERY = Resolv::DNS::Message.new 0
   DISCOVER_QUERY.add_question DISCOVERY_NAME, PTR
 
-  def self.browse *names, interfaces: self.interfaces, timeout: 3, &blk
+  # :startdoc:
+
+  ##
+  # ZeroConf.browse
+  #
+  # Call this method to find server information for a particular service.
+  # For example, to find server information for servers advertising
+  # `_elg._tcp.local`, do this:
+  #
+  #     ZeroConf.browse("_elg._tcp.local") { |r| p r }
+  #
+  # Yields info it finds to the provided block as it is received.
+  # Pass a list of interfaces you want to use, or just use the default.
+  # Also takes a timeout parameter to specify the length of the timeout.
+  #
+  # @param [Array<Socket::Ifaddr>] interfaces list of interfaces to query
+  # @param [Numeric] timeout number of seconds before returning
+  def self.browse name, interfaces: self.interfaces, timeout: 3, &blk
     port = 0
     sockets = interfaces.map { |iface|
       if iface.addr.ipv4?
@@ -66,11 +81,71 @@ module ZeroConf
       end
     }.compact
 
-    queries = names.map { |name| PTR.new name }
+    q = PTR.new(name)
 
-    send_query queries, sockets, timeout, &blk
+    sockets.each { |socket|
+      query = Resolv::DNS::Message.new 0
+
+      query.add_question q.name, q.class
+
+      multicast_send socket, query.encode
+    }
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    now = start
+    msgs = block_given? ? nil : []
+
+    loop do
+      readers, = IO.select(sockets, [], [], timeout - (now - start))
+      return msgs unless readers
+      readers.each do |reader|
+        buf, = reader.recvfrom 2048
+        msg = Resolv::DNS::Message.decode(buf)
+        if block_given?
+          return msg if :done == yield(msg)
+        else
+          msgs << msg
+        end
+      end
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    end
   ensure
     sockets.map(&:close) if sockets
+  end
+
+  ###
+  # Get a list tuples with host name and Addrinfo objects for a particular
+  # service name.
+  #
+  # For example:
+  #
+  #     pp ZeroConf.find_addrinfos("_elg._tcp.local")
+  #       # [["elgato-key-light-2d93.local", #<Addrinfo: 10.0.1.249:9123 (elgato-key-light-2d93.local)>],
+  #       #  ["elgato-key-light-2d93.local", #<Addrinfo: [fe80::3e6a:9dff:fe19:b313]:9123 (elgato-key-light-2d93.local)>],
+  #       #  ["elgato-key-light-48c6.local", #<Addrinfo: 10.0.1.151:9123 (elgato-key-light-48c6.local)>],
+  #       #  ["elgato-key-light-48c6.local", #<Addrinfo: [fe80::3e6a:9dff:fe19:3a99]:9123 (elgato-key-light-48c6.local)>]]
+  #
+  def self.find_addrinfos name, interfaces: self.interfaces, timeout: 3
+    browse(name, interfaces:, timeout:).flat_map { |r|
+      host = nil
+      port = nil
+      ipv4 = []
+      ipv6 = []
+      pp r
+      r.additional.each { |name, ttl, data|
+        case data
+        when Resolv::DNS::Resource::IN::SRV
+          host = data.target.to_s
+          port = data.port
+        when Resolv::DNS::Resource::IN::A
+          ipv4 << data.address
+        when Resolv::DNS::Resource::IN::AAAA
+          ipv6 << data.address
+        end
+      }
+      ipv4.map { |x| [host, ["AF_INET", port, host, x.to_s]] } +
+        ipv6.map { |x| [host, ["AF_INET6", port, host, x.to_s]] }
+    }.uniq.map { |host, x| [host, Addrinfo.new(x)] }
   end
 
   def self.resolve name, interfaces: self.interfaces, timeout: 3, &blk
@@ -112,6 +187,41 @@ module ZeroConf
     s.start
   end
 
+  ##
+  # ZeroConf.find_services
+  #
+  # Get a list of services being advertised on the network!
+  #
+  # This method will yield the services as it finds them, or it will
+  # return a list of unique service names if no block is given.
+  #
+  # @param [Array<Socket::Ifaddr>] interfaces list of interfaces to query
+  # @param [Numeric] timeout number of seconds before returning
+  def self.find_services interfaces: self.interfaces, timeout: 3
+    if block_given?
+      discover(interfaces:, timeout:) do |res|
+        res.answer.map(&:last).map(&:name).map(&:to_s).each { yield _1 }
+      end
+    else
+      discover(interfaces:, timeout:)
+        .flat_map(&:answer)
+        .map(&:last)
+        .map(&:name)
+        .map(&:to_s)
+        .uniq
+    end
+  end
+
+  ##
+  # ZeroConf.discover
+  #
+  # Call this method to discover services on your network!
+  # Yields services it finds to the provided block as it finds them.
+  # Pass a list of interfaces you want to use, or just use the default.
+  # Also takes a timeout parameter to specify the length of the timeout.
+  #
+  # @param [Array<Socket::Ifaddr>] interfaces list of interfaces to query
+  # @param [Numeric] timeout number of seconds before returning
   def self.discover interfaces: self.interfaces, timeout: 3
     port = 0
 
@@ -128,17 +238,23 @@ module ZeroConf
 
     start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     now = start
+    msgs = nil
 
     loop do
       readers, = IO.select(sockets, [], [], timeout && (timeout - (now - start)))
-      return unless readers
+      return msgs unless readers
       readers.each do |reader|
         buf, _ = reader.recvfrom 2048
         msg = Resolv::DNS::Message.decode(buf)
         # only yield replies to this question
         if msg.question.length > 0 && msg.question.first.last == PTR
-          if :done == yield(msg)
-            return msg
+          if block_given?
+            if :done == yield(msg)
+              return msg
+            end
+          else
+            msgs ||= []
+            msgs << msg
           end
         end
       end
@@ -167,29 +283,6 @@ module ZeroConf
     [ipv4.first, ipv6&.first].compact
   end
 
-  private_class_method def self.send_query queries, sockets, timeout
-    sockets.each { |socket| multiquery_send socket, queries, 0 }
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    now = start
-
-    loop do
-      readers, = IO.select(sockets, [], [], timeout - (now - start))
-      return unless readers
-      readers.each do |reader|
-        buf, = reader.recvfrom 2048
-        msg = Resolv::DNS::Message.decode(buf)
-        return msg if :done == yield(msg)
-      end
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
-  end
-
   private_class_method def self.multiquery_send sock, queries, query_id
-    query = Resolv::DNS::Message.new query_id
-
-    queries.each { |q| query.add_question q.name, q.class }
-
-    multicast_send sock, query.encode
   end
 end
