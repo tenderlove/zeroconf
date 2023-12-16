@@ -282,7 +282,4 @@ module ZeroConf
     ipv4, ipv6 = interfaces.partition { |ifa| ifa.addr.ipv4? }
     [ipv4.first, ipv6&.first].compact
   end
-
-  private_class_method def self.multiquery_send sock, queries, query_id
-  end
 end
