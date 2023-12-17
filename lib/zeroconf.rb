@@ -2,6 +2,9 @@
 
 require "zeroconf/utils"
 require "zeroconf/service"
+require "zeroconf/browser"
+require "zeroconf/resolver"
+require "zeroconf/discoverer"
 
 module ZeroConf
   MDNS_CACHE_FLUSH = 0x8000
@@ -72,45 +75,8 @@ module ZeroConf
   # @param [Array<Socket::Ifaddr>] interfaces list of interfaces to query
   # @param [Numeric] timeout number of seconds before returning
   def self.browse name, interfaces: self.interfaces, timeout: 3, &blk
-    port = 0
-    sockets = interfaces.map { |iface|
-      if iface.addr.ipv4?
-        open_ipv4 iface.addr, port
-      else
-        open_ipv6 iface.addr, port
-      end
-    }.compact
-
-    q = PTR.new(name)
-
-    sockets.each { |socket|
-      query = Resolv::DNS::Message.new 0
-
-      query.add_question q.name, q.class
-
-      multicast_send socket, query.encode
-    }
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    now = start
-    msgs = block_given? ? nil : []
-
-    loop do
-      readers, = IO.select(sockets, [], [], timeout - (now - start))
-      return msgs unless readers
-      readers.each do |reader|
-        buf, = reader.recvfrom 2048
-        msg = Resolv::DNS::Message.decode(buf)
-        if block_given?
-          return msg if :done == yield(msg)
-        else
-          msgs << msg
-        end
-      end
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
-  ensure
-    sockets.map(&:close) if sockets
+    browser = ZeroConf::Browser.new(name, interfaces:)
+    browser.browse(timeout:, &blk)
   end
 
   ###
@@ -148,37 +114,8 @@ module ZeroConf
   end
 
   def self.resolve name, interfaces: self.interfaces, timeout: 3, &blk
-    port = 0
-    sockets = interfaces.map { |iface|
-      if iface.addr.ipv4?
-        open_ipv4 iface.addr, port
-      else
-        open_ipv6 iface.addr, port
-      end
-    }.compact
-
-    query = Resolv::DNS::Message.new 0
-    query.add_question Resolv::DNS::Name.create(name), A
-
-    sockets.each do |sock|
-      multicast_send sock, query.encode
-    end
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    now = start
-
-    loop do
-      readers, = IO.select(sockets, [], [], timeout - (now - start))
-      return unless readers
-      readers.each do |reader|
-        buf, = reader.recvfrom 2048
-        msg = Resolv::DNS::Message.decode(buf)
-        return msg if :done == yield(msg)
-      end
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
-  ensure
-    sockets.map(&:close) if sockets
+    resolver = ZeroConf::Resolver.new(name, interfaces:)
+    resolver.resolve(timeout:, &blk)
   end
 
   def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: [""]
@@ -221,46 +158,9 @@ module ZeroConf
   #
   # @param [Array<Socket::Ifaddr>] interfaces list of interfaces to query
   # @param [Numeric] timeout number of seconds before returning
-  def self.discover interfaces: self.interfaces, timeout: 3
-    port = 0
-
-    sockets = interfaces.map { |iface|
-      if iface.addr.ipv4?
-        open_ipv4 iface.addr, port
-      else
-        open_ipv6 iface.addr, port
-      end
-    }.compact
-
-    discover_query = DISCOVER_QUERY
-    sockets.each { |socket| multicast_send(socket, discover_query.encode) }
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    now = start
-    msgs = nil
-
-    loop do
-      readers, = IO.select(sockets, [], [], timeout && (timeout - (now - start)))
-      return msgs unless readers
-      readers.each do |reader|
-        buf, _ = reader.recvfrom 2048
-        msg = Resolv::DNS::Message.decode(buf)
-        # only yield replies to this question
-        if msg.question.length > 0 && msg.question.first.last == PTR
-          if block_given?
-            if :done == yield(msg)
-              return msg
-            end
-          else
-            msgs ||= []
-            msgs << msg
-          end
-        end
-      end
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
-  ensure
-    sockets.each(&:close) if sockets
+  def self.discover interfaces: self.interfaces, timeout: 3, &blk
+    discoverer = ZeroConf::Discoverer.new(interfaces:)
+    discoverer.discover(timeout:, &blk)
   end
 
   def self.interfaces
