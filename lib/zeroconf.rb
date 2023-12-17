@@ -7,57 +7,7 @@ require "zeroconf/resolver"
 require "zeroconf/discoverer"
 
 module ZeroConf
-  MDNS_CACHE_FLUSH = 0x8000
-
-  extend Utils
   include Utils
-
-  # :stopdoc:
-  class PTR < Resolv::DNS::Resource::IN::PTR
-    MDNS_UNICAST_RESPONSE = 0x8000
-
-    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
-  end
-
-  class ANY < Resolv::DNS::Resource::IN::ANY
-    MDNS_UNICAST_RESPONSE = 0x8000
-
-    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ::Resolv::DNS::Resource::ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
-  end
-
-  class A < Resolv::DNS::Resource::IN::A
-    MDNS_UNICAST_RESPONSE = 0x8000
-
-    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
-  end
-
-  class SRV < Resolv::DNS::Resource::IN::SRV
-    MDNS_UNICAST_RESPONSE = 0x8000
-
-    ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
-  end
-
-  module MDNS
-    module Announce
-      module IN
-        [:SRV, :A, :AAAA, :TXT].each do |name|
-          const_set(name, Class.new(Resolv::DNS::Resource::IN.const_get(name)) {
-            const_set(:ClassValue, superclass::ClassValue | MDNS_CACHE_FLUSH)
-            self::ClassHash[[self::TypeValue, self::ClassValue]] = self
-          })
-        end
-      end
-    end
-  end
-
-  DISCOVER_QUERY = Resolv::DNS::Message.new 0
-  DISCOVER_QUERY.add_question DISCOVERY_NAME, PTR
-
-  # :startdoc:
 
   ##
   # ZeroConf.browse

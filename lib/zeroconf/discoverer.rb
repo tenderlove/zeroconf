@@ -6,6 +6,9 @@ module ZeroConf
   class Discoverer
     include Utils
 
+    DISCOVER_QUERY = Resolv::DNS::Message.new 0
+    DISCOVER_QUERY.add_question DISCOVERY_NAME, PTR
+
     attr_reader :interfaces
 
     def initialize interfaces: ZeroConf.interfaces
