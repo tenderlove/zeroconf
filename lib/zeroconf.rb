@@ -131,7 +131,6 @@ module ZeroConf
       port = nil
       ipv4 = []
       ipv6 = []
-      pp r
       r.additional.each { |name, ttl, data|
         case data
         when Resolv::DNS::Resource::IN::SRV
