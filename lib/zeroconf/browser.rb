@@ -4,8 +4,6 @@ require "zeroconf/client"
 
 module ZeroConf
   class Browser < Client
-    alias :browse :run
-
     private
 
     def get_query

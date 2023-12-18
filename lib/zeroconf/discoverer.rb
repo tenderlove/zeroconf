@@ -11,8 +11,6 @@ module ZeroConf
       super(nil, interfaces:)
     end
 
-    alias :discover :run
-
     private
 
     def interested? msg

@@ -4,8 +4,6 @@ require "zeroconf/client"
 
 module ZeroConf
   class Resolver < Client
-    alias :resolve :run
-
     private
 
     def get_query

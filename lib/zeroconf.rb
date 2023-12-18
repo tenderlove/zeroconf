@@ -25,7 +25,7 @@ module ZeroConf
   # @param [Numeric] timeout number of seconds before returning
   def self.browse name, interfaces: self.interfaces, timeout: 3, &blk
     browser = ZeroConf::Browser.new(name, interfaces:)
-    browser.browse(timeout:, &blk)
+    browser.run(timeout:, &blk)
   end
 
   ###
@@ -64,7 +64,7 @@ module ZeroConf
 
   def self.resolve name, interfaces: self.interfaces, timeout: 3, &blk
     resolver = ZeroConf::Resolver.new(name, interfaces:)
-    resolver.resolve(timeout:, &blk)
+    resolver.run(timeout:, &blk)
   end
 
   def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: [""]
@@ -109,7 +109,7 @@ module ZeroConf
   # @param [Numeric] timeout number of seconds before returning
   def self.discover interfaces: self.interfaces, timeout: 3, &blk
     discoverer = ZeroConf::Discoverer.new(interfaces:)
-    discoverer.discover(timeout:, &blk)
+    discoverer.run(timeout:, &blk)
   end
 
   def self.interfaces
