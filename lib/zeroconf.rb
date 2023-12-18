@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
-require "zeroconf/utils"
 require "zeroconf/service"
 require "zeroconf/browser"
 require "zeroconf/resolver"
 require "zeroconf/discoverer"
 
 module ZeroConf
-  include Utils
+  #include Utils
 
   ##
   # ZeroConf.browse

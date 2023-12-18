@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "zeroconf/utils"
+
 module ZeroConf
   class Service
     attr_reader :service, :service_port, :hostname, :service_interfaces,
@@ -191,7 +193,7 @@ module ZeroConf
           Resolv::DNS::Resource::IN::TXT.new(*@text)
       end
       msg.add_answer service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
-      msg.add_question service_name, ZeroConf::MDNS::Announce::IN::SRV
+      msg.add_question service_name, MDNS::Announce::IN::SRV
 
       msg
     end
@@ -225,7 +227,7 @@ module ZeroConf
         10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
 
-      msg.add_question service, ZeroConf::PTR
+      msg.add_question service, PTR
 
       msg
     end
@@ -238,7 +240,7 @@ module ZeroConf
       msg.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
 
-      msg.add_question DISCOVERY_NAME, ZeroConf::PTR
+      msg.add_question DISCOVERY_NAME, PTR
       msg
     end
 
@@ -344,7 +346,7 @@ module ZeroConf
         end
       end
 
-      msg.add_question qualified_host, ZeroConf::MDNS::Announce::IN::A
+      msg.add_question qualified_host, MDNS::Announce::IN::A
 
       if @text
         msg.add_additional service_name,

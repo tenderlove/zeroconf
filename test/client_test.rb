@@ -101,7 +101,7 @@ module ZeroConf
 
       took = time_it do
         ZeroConf.browse SERVICE do |msg|
-          if msg.question.find { |name, type| name.to_s == SERVICE && type == ZeroConf::PTR }
+          if msg.question.find { |name, type| name.to_s == SERVICE && type == PTR }
             found = msg
           end
         end
@@ -122,7 +122,7 @@ module ZeroConf
 
       took = time_it do
         found = ZeroConf.browse SERVICE do |msg|
-          if msg.question.find { |name, type| name.to_s == SERVICE && type == ZeroConf::PTR }
+          if msg.question.find { |name, type| name.to_s == SERVICE && type == PTR }
             :done
           end
         end

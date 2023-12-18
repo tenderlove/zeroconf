@@ -31,7 +31,7 @@ module ZeroConf
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
-      query.add_question "tc-lan-adapter._test-mdns._tcp.local.", ZeroConf::SRV
+      query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
@@ -51,7 +51,7 @@ module ZeroConf
         10,
         Resolv::DNS::Resource::IN::TXT.new(*s.text)
       expected.add_answer s.service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, s.service_port, s.qualified_host)
-      expected.add_question s.service_name, ZeroConf::MDNS::Announce::IN::SRV
+      expected.add_question s.service_name, MDNS::Announce::IN::SRV
 
       assert_equal expected, res
     end
@@ -109,7 +109,7 @@ module ZeroConf
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
-      query.add_question "_services._dns-sd._udp.local.", ZeroConf::PTR
+      query.add_question "_services._dns-sd._udp.local.", PTR
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
@@ -133,7 +133,7 @@ module ZeroConf
       expected.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
 
-      expected.add_question DISCOVERY_NAME, ZeroConf::PTR
+      expected.add_question DISCOVERY_NAME, PTR
 
       assert_equal expected, res
     end
@@ -191,7 +191,7 @@ module ZeroConf
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
-      query.add_question "_test-mdns._tcp.local.", ZeroConf::PTR
+      query.add_question "_test-mdns._tcp.local.", PTR
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
@@ -214,7 +214,7 @@ module ZeroConf
       expected.add_answer s.service,
         10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service_name))
-      expected.add_question s.service, ZeroConf::PTR
+      expected.add_question s.service, PTR
 
       assert_equal expected, res
     end
@@ -268,7 +268,7 @@ module ZeroConf
       runner = Thread.new { s.start }
 
       query = Resolv::DNS::Message.new 0
-      query.add_question "tc-lan-adapter.local.", ZeroConf::A
+      query.add_question "tc-lan-adapter.local.", A
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
@@ -287,7 +287,7 @@ module ZeroConf
         Resolv::DNS::Resource::IN::TXT.new(*s.text)
 
       expected.add_question s.qualified_host,
-        ZeroConf::MDNS::Announce::IN::A
+        MDNS::Announce::IN::A
 
       assert_equal expected, res
     end
