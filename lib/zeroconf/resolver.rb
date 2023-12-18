@@ -1,28 +1,11 @@
 # frozen_string_literal: true
 
-require "zeroconf/utils"
+require "zeroconf/client"
 
 module ZeroConf
-  class Resolver
-    include Utils
-
-    attr_reader :name, :interfaces
-
-    def initialize name, interfaces: ZeroConf.interfaces
-      @name = name
-      @interfaces = interfaces
-    end
-
+  class Resolver < Client
     def resolve timeout: 3, &blk
-      port = 0
-      sockets = interfaces.map { |iface|
-        if iface.addr.ipv4?
-          open_ipv4 iface.addr, port
-        else
-          open_ipv6 iface.addr, port
-        end
-      }.compact
-
+      sockets = open_interfaces 0
       query = Resolv::DNS::Message.new 0
       query.add_question Resolv::DNS::Name.create(name), A
 

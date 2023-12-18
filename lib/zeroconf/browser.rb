@@ -1,27 +1,11 @@
 # frozen_string_literal: true
 
-require "zeroconf/utils"
+require "zeroconf/client"
 
 module ZeroConf
-  class Browser
-    include Utils
-
-    attr_reader :name, :interfaces
-
-    def initialize name, interfaces: ZeroConf.interfaces
-      @name = name
-      @interfaces = interfaces
-    end
-
+  class Browser < Client
     def browse timeout: 3, &blk
-      port = 0
-      sockets = interfaces.map { |iface|
-        if iface.addr.ipv4?
-          open_ipv4 iface.addr, port
-        else
-          open_ipv6 iface.addr, port
-        end
-      }.compact
+      sockets = open_interfaces 0
 
       q = PTR.new(name)
 
