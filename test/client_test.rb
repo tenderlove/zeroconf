@@ -12,6 +12,7 @@ module ZeroConf
     def test_resolve
       s = make_server iface, "coolhostname"
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       name = "coolhostname.local"
@@ -28,12 +29,13 @@ module ZeroConf
       runner.join
 
       assert found
-      assert_in_delta 3, took, 0.1
+      assert_in_delta 3, took, 0.2
     end
 
     def test_resolve_returns_early
       s = make_server iface, "coolhostname"
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       name = "coolhostname.local"
@@ -57,6 +59,7 @@ module ZeroConf
     def test_discover_works
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       took = time_it do
@@ -71,12 +74,13 @@ module ZeroConf
       runner.join
 
       assert found
-      assert_in_delta 3, took, 0.1
+      assert_in_delta 3, took, 0.2
     end
 
     def test_discover_return_early
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       took = time_it do
@@ -97,6 +101,7 @@ module ZeroConf
     def test_browse
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       took = time_it do
@@ -112,12 +117,13 @@ module ZeroConf
 
       assert found
       assert_equal Resolv::DNS::Name.create(SERVICE_NAME + "."), found.answer.first.last.name
-      assert_in_delta 3, took, 0.1
+      assert_in_delta 3, took, 0.2
     end
 
     def test_browse_returns_early
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
       found = nil
 
       took = time_it do

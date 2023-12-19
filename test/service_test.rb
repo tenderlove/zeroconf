@@ -29,13 +29,14 @@ module ZeroConf
     def test_unicast_service_instance_answer
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode sock.recvfrom(2048).first
+      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
       runner.join
 
@@ -63,6 +64,7 @@ module ZeroConf
       listen = make_listener rd, q
       s = make_server iface
       server = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
@@ -165,6 +167,7 @@ module ZeroConf
     def test_dnssd_unicast_answer
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", PTR
@@ -174,7 +177,7 @@ module ZeroConf
 
       res = nil
       loop do
-        buf, from = sock.recvfrom(2048)
+        buf, from = read_with_timeout sock
         res = Resolv::DNS::Message.decode buf
         if from.last == iface.addr.ip_address
           break if res.answer.find { |name, ttl, data| data.name.to_s == SERVICE }
@@ -197,12 +200,13 @@ module ZeroConf
     end
 
     def test_service_multicast_answer
-      q = Queue.new
+      q = Thread::Queue.new
       rd, wr = IO.pipe
 
       listen = make_listener rd, q
       s = make_server iface
       server = Thread.new { s.start }
+      Thread.pass until s.started? && listen[:started]
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
@@ -213,7 +217,8 @@ module ZeroConf
       service_name = Resolv::DNS::Name.create s.service_name
 
       while res = q.pop
-        if res.answer.find { |name, ttl, data| name == service && data.name == service_name }
+        if res.answer.find { |name, ttl, data| name == service && data.name == service_name } &&
+            res.additional.find { |_, _, data| ZeroConf::MDNS::Announce::IN::SRV == data.class }
           wr.write "x"
           break
         end
@@ -241,19 +246,20 @@ module ZeroConf
         60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service_name))
 
-      assert_equal msg.encode, res.encode
+      assert_equal msg, res
     end
 
     def test_service_unicast_answer
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", PTR
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode sock.recvfrom(2048).first
+      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
       runner.join
 
@@ -284,6 +290,7 @@ module ZeroConf
       listen = make_listener rd, q
       s = make_server iface
       server = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
@@ -324,13 +331,14 @@ module ZeroConf
     def test_unicast_name_lookup
       s = make_server iface
       runner = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", A
 
       sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode sock.recvfrom(2048).first
+      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
       runner.join
 
@@ -357,6 +365,7 @@ module ZeroConf
       listen = make_listener rd, q
       s = make_server iface
       server = Thread.new { s.start }
+      Thread.pass until s.started?
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
@@ -387,6 +396,11 @@ module ZeroConf
         Resolv::DNS::Resource::IN::TXT.new(*s.text)
 
       assert_equal expected, res
+    end
+
+    def read_with_timeout sock
+      return unless sock.wait_readable(3)
+      sock.recvfrom(2048)
     end
   end
 end
