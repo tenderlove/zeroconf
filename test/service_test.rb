@@ -91,17 +91,75 @@ module ZeroConf
     end
 
     def test_announcement
-      ann = "\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x04\n_test-mdns\x04_tcp\x05local\x00\x00\f\x00\x01\x00\x00\x00<\x00\x15\x0Etc-lan-adapter\x03lan\xC0\f\xC0-\x00!\x80\x01\x00\x00\x00<\x00 \x00\x00\x00\x00\xA5\xB8\x0Etc-lan-adapter\x03lan\x05local\x00\xC0T\x00\x01\x80\x01\x00\x00\x00<\x00\x04\n\x00\x01\x95\xC0T\x00\x1C\x80\x01\x00\x00\x00<\x00\x10\xFD\xDA\x85k\tL\x00\x00\x10\xF6\x892\xEA\xBB\\H\xC0-\x00\x10\x80\x01\x00\x00\x00<\x00\x01\x00".b
-      msg = Resolv::DNS::Message.decode ann
+      # FIXME: this test should be converted to an integration test.
+      # We need to make a client listen for the announcement and then decode that
       service = Service.new "_test-mdns._tcp.local.", 42424
+
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional service.service_name, 60, MDNS::Announce::IN::SRV.new(0, 0, service.service_port, service.qualified_host)
+
+      service.service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional service.qualified_host,
+            60,
+            MDNS::Announce::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional service.qualified_host,
+            60,
+            MDNS::Announce::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if service.text
+        msg.add_additional service.service_name,
+          60,
+          MDNS::Announce::IN::TXT.new(*service.text)
+      end
+
+      msg.add_answer service.service,
+        60,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service.service_name))
+
       assert_equal msg, service.announcement
     end
 
     def test_disconnect
-      data = "\x00\x00\x84\x00\x00\x00\x00\x01\x00\x00\x00\x03\n_test-mdns\x04_tcp\x05local\x00\x00\f\x00\x01\x00\x00\x00\x00\x00\x11\x0Etc-lan-adapter\xC0\f\xC0-\x00!\x00\x01\x00\x00\x00\x00\x00\x1C\x00\x00\x00\x00\xA5\xB8\x0Etc-lan-adapter\x05local\x00\xC0P\x00\x01\x00\x01\x00\x00\x00\x00\x00\x04\n\x00\x01\x95\xC0-\x00\x10\x00\x01\x00\x00\x00\x00\x00\x13\x06test=1\vother=value".b
-      m = Resolv::DNS::Message.decode data
+      # FIXME: this test should be converted to an integration test.
+      # We need to make a client listen for the disconnect and then decode that
       s = make_server iface
-      assert_equal m, s.disconnect_msg
+
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional s.service_name, 0, Resolv::DNS::Resource::IN::SRV.new(0, 0, s.service_port, s.qualified_host)
+
+      s.service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional s.qualified_host,
+            0,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional s.qualified_host,
+            0,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if s.text
+        msg.add_additional s.service_name,
+          0,
+          Resolv::DNS::Resource::IN::TXT.new(*s.text)
+      end
+
+      msg.add_answer s.service,
+        0,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service_name))
+
+      assert_equal msg, s.disconnect_msg
     end
 
     def test_dnssd_unicast_answer
