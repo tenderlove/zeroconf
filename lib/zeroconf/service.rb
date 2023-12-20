@@ -170,8 +170,8 @@ module ZeroConf
         end
       end
     ensure
-      multicast_send sock, disconnect_msg.encode
-      sockets.map(&:close)
+      multicast_send(sock, disconnect_msg.encode) if sock
+      sockets.map(&:close) if sockets
     end
 
     private
