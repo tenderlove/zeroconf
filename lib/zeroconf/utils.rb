@@ -74,12 +74,20 @@ module ZeroConf
 
     def multicast_send sock, query
       dest = if sock.local_address.ipv4?
-        BROADCAST_V4
+        broadcast_v4
       else
-        BROADCAST_V6
+        broadcast_v6
       end
 
       sock.send(query, 0, dest)
+    end
+
+    def broadcast_v4
+      BROADCAST_V4
+    end
+
+    def broadcast_v6
+      BROADCAST_V6
     end
 
     def unicast_send sock, data, to

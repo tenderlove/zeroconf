@@ -4,6 +4,8 @@ require "zeroconf/utils"
 
 module ZeroConf
   class Service
+    include Utils
+
     attr_reader :service, :service_port, :hostname, :service_interfaces,
       :service_name, :qualified_host, :text
 
@@ -81,8 +83,6 @@ module ZeroConf
 
       msg
     end
-
-    include Utils
 
     def stop
       @wr.write "x"
