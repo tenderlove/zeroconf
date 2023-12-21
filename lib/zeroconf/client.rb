@@ -24,8 +24,13 @@ module ZeroConf
       msgs = block_given? ? nil : []
 
       loop do
-        readers, = IO.select(sockets, [], [], timeout && (timeout - (now - start)))
+        wait = timeout && timeout - (now - start)
+        return if wait && wait < 0
+
+        readers, = IO.select(sockets, [], [], wait)
+
         return msgs unless readers
+
         readers.each do |reader|
           buf, _ = reader.recvfrom 2048
           msg = Resolv::DNS::Message.decode(buf)
