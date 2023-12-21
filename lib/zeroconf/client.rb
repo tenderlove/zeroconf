@@ -14,7 +14,7 @@ module ZeroConf
     end
 
     def run timeout: 3
-      sockets = open_interfaces 0
+      sockets = open_interfaces interfaces.map(&:addr), 0
 
       query = get_query
       sockets.each { |socket| multicast_send(socket, query.encode) }
@@ -50,12 +50,12 @@ module ZeroConf
 
     def interested? _; true; end
 
-    def open_interfaces port
-      interfaces.map { |iface|
-        if iface.addr.ipv4?
-          open_ipv4 iface.addr, port
+    def open_interfaces addrs, port
+      addrs.map { |addr|
+        if addr.ipv4?
+          open_ipv4 addr, port
         else
-          open_ipv6 iface.addr, port
+          open_ipv6 addr, port
         end
       }.compact
     end
