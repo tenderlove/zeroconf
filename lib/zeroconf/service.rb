@@ -17,8 +17,11 @@ module ZeroConf
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
       @text = text
+      @started = false
       @rd, @wr = IO.pipe
     end
+
+    def started?; @started; end
 
     def announcement
       msg = Resolv::DNS::Message.new(0)
@@ -87,6 +90,7 @@ module ZeroConf
     def stop
       @wr.write "x"
       @wr.close
+      @started = false
     end
 
     def start
@@ -98,6 +102,8 @@ module ZeroConf
 
       # announce
       multicast_send(sock, msg.encode)
+
+      @started = true
 
       loop do
         readers, = IO.select(sockets, [], [])
