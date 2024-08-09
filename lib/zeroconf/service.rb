@@ -122,7 +122,9 @@ module ZeroConf
 
             break unless class_type == 1 || class_type == 255
 
-            unicast = type::ClassValue & PTR::MDNS_UNICAST_RESPONSE > 0
+            legacy = from[1] != Resolv::MDNS::Port
+            unicast = legacy || type::ClassValue & PTR::MDNS_UNICAST_RESPONSE > 0
+            reply_id = legacy ? msg.id : 0
 
             qn = name.to_s + "."
 
@@ -131,25 +133,25 @@ module ZeroConf
               break if has_flags
 
               if unicast
-                dnssd_unicast_answer
+                dnssd_unicast_answer(reply_id)
               else
                 dnssd_multicast_answer
               end
             when service
               if unicast
-                service_unicast_answer
+                service_unicast_answer(reply_id)
               else
                 service_multicast_answer
               end
             when service_name
               if unicast
-                service_instance_unicast_answer
+                service_instance_unicast_answer(reply_id)
               else
                 service_instance_multicast_answer
               end
             when qualified_host
               if unicast
-                name_answer_unicast
+                name_answer_unicast(reply_id)
               else
                 name_answer_multicast
               end
@@ -176,10 +178,11 @@ module ZeroConf
 
     private
 
-    def service_instance_unicast_answer
+    def service_instance_unicast_answer(id)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
+      msg.id = id
 
       service_interfaces.each do |iface|
         if iface.addr.ipv4?
@@ -204,10 +207,11 @@ module ZeroConf
       msg
     end
 
-    def service_unicast_answer
+    def service_unicast_answer(id)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
+      msg.id = id
 
       msg.add_additional service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
 
@@ -238,10 +242,11 @@ module ZeroConf
       msg
     end
 
-    def dnssd_unicast_answer
+    def dnssd_unicast_answer(id)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
+      msg.id = id
 
       msg.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
@@ -320,10 +325,11 @@ module ZeroConf
       msg
     end
 
-    def name_answer_unicast
+    def name_answer_unicast(id)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
+      msg.id = id
 
       first = true
 
