@@ -34,7 +34,7 @@ module ZeroConf
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
 
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -68,7 +68,7 @@ module ZeroConf
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
 
       while res = q.pop
@@ -172,7 +172,7 @@ module ZeroConf
       query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", PTR
 
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
 
       res = nil
@@ -210,7 +210,7 @@ module ZeroConf
 
       query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
 
       service = Resolv::DNS::Name.create s.service
@@ -257,7 +257,7 @@ module ZeroConf
       query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", PTR
 
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -294,7 +294,7 @@ module ZeroConf
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
 
       service_name = Resolv::DNS::Name.create s.service_name
@@ -336,7 +336,7 @@ module ZeroConf
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", A
 
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -369,7 +369,7 @@ module ZeroConf
 
       query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
-      sock = open_ipv4 iface.addr, 0
+      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, query.encode
 
       host = Resolv::DNS::Name.create s.qualified_host
