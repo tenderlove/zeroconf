@@ -133,25 +133,25 @@ module ZeroConf
               break if has_flags
 
               if unicast
-                dnssd_unicast_answer(reply_id)
+                dnssd_unicast_answer(id: reply_id, legacy: legacy)
               else
                 dnssd_multicast_answer
               end
             when service
               if unicast
-                service_unicast_answer(reply_id)
+                service_unicast_answer(id: reply_id, legacy: legacy)
               else
                 service_multicast_answer
               end
             when service_name
               if unicast
-                service_instance_unicast_answer(reply_id)
+                service_instance_unicast_answer(id: reply_id, legacy: legacy)
               else
                 service_instance_multicast_answer
               end
             when qualified_host
               if unicast
-                name_answer_unicast(reply_id)
+                name_answer_unicast(id: reply_id, legacy: legacy)
               else
                 name_answer_multicast
               end
@@ -178,7 +178,7 @@ module ZeroConf
 
     private
 
-    def service_instance_unicast_answer(id)
+    def service_instance_unicast_answer(id:, legacy:)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
@@ -202,12 +202,12 @@ module ZeroConf
           Resolv::DNS::Resource::IN::TXT.new(*@text)
       end
       msg.add_answer service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
-      msg.add_question service_name, MDNS::Announce::IN::SRV
+      msg.add_question service_name, legacy ? Resolv::DNS::Resource::IN::SRV : MDNS::Announce::IN::SRV
 
       msg
     end
 
-    def service_unicast_answer(id)
+    def service_unicast_answer(id:, legacy:)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
@@ -237,12 +237,12 @@ module ZeroConf
         10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
 
-      msg.add_question service, PTR
+      msg.add_question service, legacy ? Resolv::DNS::Resource::IN::PTR : PTR
 
       msg
     end
 
-    def dnssd_unicast_answer(id)
+    def dnssd_unicast_answer(id:, legacy:)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
@@ -251,7 +251,7 @@ module ZeroConf
       msg.add_answer DISCOVERY_NAME, 10,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service))
 
-      msg.add_question DISCOVERY_NAME, PTR
+      msg.add_question DISCOVERY_NAME, legacy ? Resolv::DNS::Resource::IN::PTR : PTR
       msg
     end
 
@@ -325,7 +325,7 @@ module ZeroConf
       msg
     end
 
-    def name_answer_unicast(id)
+    def name_answer_unicast(id:, legacy:)
       msg = Resolv::DNS::Message.new(0)
       msg.qr = 1
       msg.aa = 1
@@ -358,7 +358,7 @@ module ZeroConf
         end
       end
 
-      msg.add_question qualified_host, MDNS::Announce::IN::A
+      msg.add_question qualified_host, legacy ? Resolv::DNS::Resource::IN::A : MDNS::Announce::IN::A
 
       if @text
         msg.add_additional service_name,
