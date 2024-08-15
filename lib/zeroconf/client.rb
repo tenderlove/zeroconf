@@ -14,7 +14,7 @@ module ZeroConf
     end
 
     def run timeout: 3
-      sockets = open_interfaces interfaces.map(&:addr), 0
+      sockets = open_interfaces interfaces.map(&:addr), Resolv::MDNS::Port
 
       query = get_query
       sockets.each { |socket| multicast_send(socket, query.encode) }
