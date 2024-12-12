@@ -39,11 +39,12 @@ module ZeroConf
       Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
     end
 
-    def make_server iface, host = HOST_NAME
+    def make_server iface, host = HOST_NAME, **opts
       Service.new SERVICE + ".",
         42424,
         host,
-        service_interfaces: [iface], text: ["test=1", "other=value"]
+        service_interfaces: [iface], text: ["test=1", "other=value"],
+        **opts
     end
 
     def make_listener rd, q

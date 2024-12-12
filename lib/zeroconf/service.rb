@@ -7,13 +7,14 @@ module ZeroConf
     include Utils
 
     attr_reader :service, :service_port, :hostname, :service_interfaces,
-      :service_name, :qualified_host, :text
+      :service_name, :qualified_host, :text, :ignore_malformed_requests
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""]
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], ignore_malformed_requests: false
       @service = service
       @service_port = service_port
       @hostname = hostname
       @service_interfaces = service_interfaces
+      @ignore_malformed_requests = ignore_malformed_requests
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
       @text = text
@@ -113,7 +114,13 @@ module ZeroConf
           return if reader == @rd
 
           buf, from = reader.recvfrom 2048
-          msg = Resolv::DNS::Message.decode(buf)
+          msg = begin
+            Resolv::DNS::Message.decode(buf)
+          rescue Resolv::DNS::DecodeError
+            next if ignore_malformed_requests
+
+            raise
+          end
 
           has_flags = (buf.getbyte(3) << 8 | buf.getbyte(2)) != 0
 
