@@ -39,16 +39,18 @@ module ZeroConf
       Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
     end
 
-    def make_server iface, host = HOST_NAME
+    def make_server iface, host = HOST_NAME, **opts
       Service.new SERVICE + ".",
         42424,
         host,
-        service_interfaces: [iface], text: ["test=1", "other=value"]
+        service_interfaces: [iface], text: ["test=1", "other=value"],
+        **opts
     end
 
-    def make_listener rd, q
+    def make_listener rd, q, started_callback: nil
       Thread.new do
         sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port
+        started_callback&.call
         Thread.current[:started] = true
         loop do
           readers, = IO.select([sock, rd])

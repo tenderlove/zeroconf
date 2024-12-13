@@ -7,15 +7,17 @@ module ZeroConf
     include Utils
 
     attr_reader :service, :service_port, :hostname, :service_interfaces,
-      :service_name, :qualified_host, :text
+      :service_name, :qualified_host, :text, :abort_on_malformed_requests
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""]
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], abort_on_malformed_requests: false, started_callback: nil
       @service = service
       @service_port = service_port
       @hostname = hostname
       @service_interfaces = service_interfaces
+      @abort_on_malformed_requests = abort_on_malformed_requests
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
+      @started_callback = started_callback
       @text = text
       @started = false
       @rd, @wr = IO.pipe
@@ -88,6 +90,7 @@ module ZeroConf
     end
 
     def stop
+      return unless @started
       @wr.write "x"
       @wr.close
       @started = false
@@ -104,16 +107,27 @@ module ZeroConf
       multicast_send(sock, msg.encode)
 
       @started = true
+      @started_callback&.call
 
       loop do
         readers, = IO.select(sockets, [], [])
         next unless readers
 
         readers.each do |reader|
-          return if reader == @rd
+          if reader == @rd
+            @rd.close
+            return
+          end
 
           buf, from = reader.recvfrom 2048
-          msg = Resolv::DNS::Message.decode(buf)
+          msg = begin
+            Resolv::DNS::Message.decode(buf)
+          rescue Resolv::DNS::DecodeError
+            next unless abort_on_malformed_requests
+            @rd.close
+            stop
+            raise
+          end
 
           has_flags = (buf.getbyte(3) << 8 | buf.getbyte(2)) != 0
 
