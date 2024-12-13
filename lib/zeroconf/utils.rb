@@ -4,7 +4,6 @@ require "socket"
 require "ipaddr"
 require "fcntl"
 require "resolv"
-require "rbconfig"
 
 module ZeroConf
   MDNS_CACHE_FLUSH = 0x8000
@@ -58,7 +57,7 @@ module ZeroConf
     def open_ipv4 saddr, port
       sock = UDPSocket.new Socket::AF_INET
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
-      sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) unless RbConfig::CONFIG["host_os"].include?("linux")
+      sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, true)
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_LOOP, true)
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP,
@@ -98,7 +97,7 @@ module ZeroConf
     def open_ipv6 saddr, port
       sock = UDPSocket.new Socket::AF_INET6
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
-      sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) unless RbConfig::CONFIG["host_os"].include?("linux")
+      sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
       sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_MULTICAST_HOPS, true)
       sock.setsockopt(Socket::IPPROTO_IPV6, Socket::IPV6_MULTICAST_LOOP, true)
 

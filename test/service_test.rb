@@ -32,10 +32,10 @@ module ZeroConf
       runner = Thread.new { s.start }
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
 
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -58,38 +58,6 @@ module ZeroConf
       assert_equal expected, res
     end
 
-    def test_legacy_unicast_service_instance_answer
-      latch = Queue.new
-      s = make_server iface, started_callback: -> { latch << :start }
-      runner = Thread.new { s.start }
-      latch.pop
-
-      query = Resolv::DNS::Message.new 10
-      query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::SRV
-
-      sock = open_ipv4 iface.addr, 0
-      multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
-      s.stop
-      runner.join
-
-      expected = Resolv::DNS::Message.new(10)
-      expected.qr = 1
-      expected.aa = 1
-
-      expected.add_additional s.qualified_host,
-        10,
-        Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
-
-      expected.add_additional s.service_name,
-        10,
-        Resolv::DNS::Resource::IN::TXT.new(*s.text)
-      expected.add_answer s.service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, s.service_port, s.qualified_host)
-      expected.add_question s.service_name, Resolv::DNS::Resource::IN::SRV
-
-      assert_equal expected, res
-    end
-
     def test_multicast_discover
       q = Queue.new
       rd, wr = IO.pipe
@@ -100,9 +68,9 @@ module ZeroConf
       server = Thread.new { s.start }
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
       while res = q.pop
@@ -204,10 +172,10 @@ module ZeroConf
       runner = Thread.new { s.start }
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "_services._dns-sd._udp.local.", PTR
 
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
       res = nil
@@ -234,42 +202,6 @@ module ZeroConf
       assert_equal expected, res
     end
 
-    def test_dnssd_legacy_unicast_answer
-      latch = Queue.new
-      s = make_server iface, started_callback: -> { latch << :start }
-      runner = Thread.new { s.start }
-      latch.pop
-
-      query = Resolv::DNS::Message.new 10
-      query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
-
-      sock = open_ipv4 iface.addr, 0
-      multicast_send sock, query.encode
-
-      res = nil
-      loop do
-        buf, from = read_with_timeout sock
-        res = Resolv::DNS::Message.decode buf
-        if from.last == iface.addr.ip_address
-          break if res.answer.find { |name, ttl, data| data.name.to_s == SERVICE }
-        end
-      end
-
-      s.stop
-      runner.join
-
-      expected = Resolv::DNS::Message.new(10)
-      expected.qr = 1
-      expected.aa = 1
-
-      expected.add_answer DISCOVERY_NAME, 10,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service))
-
-      expected.add_question DISCOVERY_NAME, Resolv::DNS::Resource::IN::PTR
-
-      assert_equal expected, res
-    end
-
     def test_service_multicast_answer
       q = Thread::Queue.new
       rd, wr = IO.pipe
@@ -281,9 +213,9 @@ module ZeroConf
       latch.pop
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
       service = Resolv::DNS::Name.create s.service
@@ -328,10 +260,10 @@ module ZeroConf
       runner = Thread.new { s.start }
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "_test-mdns._tcp.local.", PTR
 
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -357,42 +289,6 @@ module ZeroConf
       assert_equal expected, res
     end
 
-    def test_service_legacy_unicast_answer
-      latch = Queue.new
-      s = make_server iface, started_callback: -> { latch << :start }
-      runner = Thread.new { s.start }
-      latch.pop
-
-      query = Resolv::DNS::Message.new 10
-      query.add_question "_test-mdns._tcp.local.", PTR
-
-      sock = open_ipv4 iface.addr, 0
-      multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
-      s.stop
-      runner.join
-
-      expected = Resolv::DNS::Message.new(10)
-      expected.qr = 1
-      expected.aa = 1
-
-      expected.add_additional s.service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, s.service_port, s.qualified_host)
-      expected.add_additional s.qualified_host,
-            10,
-            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
-
-      expected.add_additional s.service_name,
-        10,
-        Resolv::DNS::Resource::IN::TXT.new(*s.text)
-      expected.add_answer s.service,
-        10,
-        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service_name))
-      expected.add_question s.service, Resolv::DNS::Resource::IN::PTR
-
-      assert_equal expected, res
-    end
-
-
     def test_multicast_service_instance_answer
       q = Queue.new
       rd, wr = IO.pipe
@@ -404,9 +300,9 @@ module ZeroConf
       latch.pop
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
       service_name = Resolv::DNS::Name.create s.service_name
@@ -446,10 +342,10 @@ module ZeroConf
       runner = Thread.new { s.start }
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", A
 
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
       res = Resolv::DNS::Message.decode read_with_timeout(sock).first
       s.stop
@@ -471,37 +367,6 @@ module ZeroConf
       assert_equal expected, res
     end
 
-    def test_legacy_unicast_name_lookup
-      latch = Queue.new
-      s = make_server iface, started_callback: -> { latch << :start }
-      runner = Thread.new { s.start }
-      latch.pop
-
-      query = Resolv::DNS::Message.new 10
-      query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
-
-      sock = open_ipv4 iface.addr, 0
-      multicast_send sock, query.encode
-      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
-      s.stop
-      runner.join
-
-      expected = Resolv::DNS::Message.new(10)
-      expected.qr = 1
-      expected.aa = 1
-
-      expected.add_answer s.qualified_host, 10, Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
-
-      expected.add_additional s.service_name,
-        10,
-        Resolv::DNS::Resource::IN::TXT.new(*s.text)
-
-      expected.add_question s.qualified_host,
-        Resolv::DNS::Resource::IN::A
-
-      assert_equal expected, res
-    end
-
     def test_multicast_name
       q = Queue.new
       rd, wr = IO.pipe
@@ -513,9 +378,9 @@ module ZeroConf
       latch.pop
       latch.pop
 
-      query = Resolv::DNS::Message.new 10
+      query = Resolv::DNS::Message.new 0
       query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
-      sock = open_ipv4 iface.addr, Resolv::MDNS::Port
+      sock = open_ipv4 iface.addr, 0
       multicast_send sock, query.encode
 
       host = Resolv::DNS::Name.create s.qualified_host
