@@ -529,14 +529,17 @@ module ZeroConf
       assert_equal expected, res
     end
 
-    def test_ignore_malformed_requests
-      s = make_server iface, ignore_malformed_requests: true
-      runner = Thread.new { s.start }
+    def test_raise_on_malformed_requests
+      s = make_server iface, abort_on_malformed_requests: true
+      runner = Thread.new {
+        assert_raises do
+          s.start
+        end
+      }
       Thread.pass until s.started?
 
       sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, "not a valid DNS message"
-      s.stop
       runner.join
     end
 

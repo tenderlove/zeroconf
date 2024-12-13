@@ -67,8 +67,8 @@ module ZeroConf
     resolver.run(timeout:, &blk)
   end
 
-  def self.service service, service_port, hostname = Socket.gethostname, service_interfaces: self.service_interfaces, text: [""], ignore_malformed_requests: false
-    s = Service.new(service, service_port, hostname, service_interfaces:, text:, ignore_malformed_requests:)
+  def self.service ...
+    s = Service.new(...)
     s.start
   end
 

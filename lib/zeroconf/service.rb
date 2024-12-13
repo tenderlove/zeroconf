@@ -7,14 +7,14 @@ module ZeroConf
     include Utils
 
     attr_reader :service, :service_port, :hostname, :service_interfaces,
-      :service_name, :qualified_host, :text, :ignore_malformed_requests
+      :service_name, :qualified_host, :text, :abort_on_malformed_requests
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], ignore_malformed_requests: false
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], abort_on_malformed_requests: false
       @service = service
       @service_port = service_port
       @hostname = hostname
       @service_interfaces = service_interfaces
-      @ignore_malformed_requests = ignore_malformed_requests
+      @abort_on_malformed_requests = abort_on_malformed_requests
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
       @text = text
@@ -89,6 +89,7 @@ module ZeroConf
     end
 
     def stop
+      return unless @started
       @wr.write "x"
       @wr.close
       @started = false
@@ -111,14 +112,18 @@ module ZeroConf
         next unless readers
 
         readers.each do |reader|
-          return if reader == @rd
+          if reader == @rd
+            @rd.close
+            return
+          end
 
           buf, from = reader.recvfrom 2048
           msg = begin
             Resolv::DNS::Message.decode(buf)
           rescue Resolv::DNS::DecodeError
-            next if ignore_malformed_requests
-
+            next unless abort_on_malformed_requests
+            @rd.close
+            stop
             raise
           end
 
