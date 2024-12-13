@@ -9,7 +9,7 @@ module ZeroConf
     attr_reader :service, :service_port, :hostname, :service_interfaces,
       :service_name, :qualified_host, :text, :abort_on_malformed_requests
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], abort_on_malformed_requests: false
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], abort_on_malformed_requests: false, started_callback: nil
       @service = service
       @service_port = service_port
       @hostname = hostname
@@ -17,6 +17,7 @@ module ZeroConf
       @abort_on_malformed_requests = abort_on_malformed_requests
       @service_name = "#{hostname}.#{service}"
       @qualified_host = "#{hostname}.local."
+      @started_callback = started_callback
       @text = text
       @started = false
       @rd, @wr = IO.pipe
@@ -106,6 +107,7 @@ module ZeroConf
       multicast_send(sock, msg.encode)
 
       @started = true
+      @started_callback&.call
 
       loop do
         readers, = IO.select(sockets, [], [])

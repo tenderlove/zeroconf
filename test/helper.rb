@@ -47,9 +47,10 @@ module ZeroConf
         **opts
     end
 
-    def make_listener rd, q
+    def make_listener rd, q, started_callback: nil
       Thread.new do
         sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port
+        started_callback&.call
         Thread.current[:started] = true
         loop do
           readers, = IO.select([sock, rd])

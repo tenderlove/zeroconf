@@ -27,9 +27,10 @@ module ZeroConf
     end
 
     def test_unicast_service_instance_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", SRV
@@ -58,9 +59,10 @@ module ZeroConf
     end
 
     def test_legacy_unicast_service_instance_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::SRV
@@ -93,9 +95,10 @@ module ZeroConf
       rd, wr = IO.pipe
 
       listen = make_listener rd, q
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       server = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
@@ -196,9 +199,10 @@ module ZeroConf
     end
 
     def test_dnssd_unicast_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_services._dns-sd._udp.local.", PTR
@@ -231,9 +235,10 @@ module ZeroConf
     end
 
     def test_dnssd_legacy_unicast_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_services._dns-sd._udp.local.", Resolv::DNS::Resource::IN::PTR
@@ -269,10 +274,12 @@ module ZeroConf
       q = Thread::Queue.new
       rd, wr = IO.pipe
 
-      listen = make_listener rd, q
-      s = make_server iface
+      latch = Queue.new
+      listen = make_listener rd, q, started_callback: -> { latch << :start }
+      s = make_server iface, started_callback: -> { latch << :start }
       server = Thread.new { s.start }
-      Thread.pass until s.started? && listen[:started]
+      latch.pop
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
@@ -316,9 +323,10 @@ module ZeroConf
     end
 
     def test_service_unicast_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_test-mdns._tcp.local.", PTR
@@ -350,9 +358,10 @@ module ZeroConf
     end
 
     def test_service_legacy_unicast_answer
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "_test-mdns._tcp.local.", PTR
@@ -388,10 +397,12 @@ module ZeroConf
       q = Queue.new
       rd, wr = IO.pipe
 
-      listen = make_listener rd, q
-      s = make_server iface
+      latch = Queue.new
+      listen = make_listener rd, q, started_callback: -> { latch << :start }
+      s = make_server iface, started_callback: -> { latch << :start }
       server = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter._test-mdns._tcp.local.", Resolv::DNS::Resource::IN::PTR
@@ -430,9 +441,10 @@ module ZeroConf
     end
 
     def test_unicast_name_lookup
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter.local.", A
@@ -460,9 +472,10 @@ module ZeroConf
     end
 
     def test_legacy_unicast_name_lookup
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
@@ -493,10 +506,12 @@ module ZeroConf
       q = Queue.new
       rd, wr = IO.pipe
 
-      listen = make_listener rd, q
-      s = make_server iface
+      latch = Queue.new
+      listen = make_listener rd, q, started_callback: -> { latch << :start }
+      s = make_server iface, started_callback: -> { latch << :start }
       server = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
+      latch.pop
 
       query = Resolv::DNS::Message.new 10
       query.add_question "tc-lan-adapter.local.", Resolv::DNS::Resource::IN::A
@@ -530,13 +545,14 @@ module ZeroConf
     end
 
     def test_raise_on_malformed_requests
-      s = make_server iface, abort_on_malformed_requests: true
+      latch = Queue.new
+      s = make_server iface, abort_on_malformed_requests: true, started_callback: -> { latch << :start }
       runner = Thread.new {
         assert_raises do
           s.start
         end
       }
-      Thread.pass until s.started?
+      latch.pop
 
       sock = open_ipv4 iface.addr, Resolv::MDNS::Port
       multicast_send sock, "not a valid DNS message"

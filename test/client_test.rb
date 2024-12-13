@@ -10,9 +10,10 @@ module ZeroConf
     end
 
     def test_resolve
-      s = make_server iface, "coolhostname"
+      latch = Queue.new
+      s = make_server iface, "coolhostname", started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       name = "coolhostname.local"
@@ -33,9 +34,10 @@ module ZeroConf
     end
 
     def test_resolve_returns_early
-      s = make_server iface, "coolhostname"
+      latch = Queue.new
+      s = make_server iface, "coolhostname", started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       name = "coolhostname.local"
@@ -57,9 +59,10 @@ module ZeroConf
     end
 
     def test_discover_works
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       took = time_it do
@@ -78,9 +81,10 @@ module ZeroConf
     end
 
     def test_discover_return_early
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       took = time_it do
@@ -99,9 +103,10 @@ module ZeroConf
     end
 
     def test_browse
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       took = time_it do
@@ -121,9 +126,10 @@ module ZeroConf
     end
 
     def test_browse_returns_early
-      s = make_server iface
+      latch = Queue.new
+      s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
-      Thread.pass until s.started?
+      latch.pop
       found = nil
 
       took = time_it do
