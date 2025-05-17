@@ -9,14 +9,21 @@ module ZeroConf
     attr_reader :service, :service_port, :hostname, :service_interfaces,
       :service_name, :qualified_host, :text, :abort_on_malformed_requests
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, text: [""], abort_on_malformed_requests: false, started_callback: nil
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, instance_name: nil, text: [""], abort_on_malformed_requests: false, started_callback: nil
       @service = service
       @service_port = service_port
-      @hostname = hostname
+
+      @hostname = strip_dot_local(hostname) # We re-add .local anyway, later on
       @service_interfaces = service_interfaces
       @abort_on_malformed_requests = abort_on_malformed_requests
-      @service_name = "#{hostname}.#{service}"
-      @qualified_host = "#{hostname}.local."
+
+      instance_name ||= @hostname
+      if instance_name.include?(".")
+        raise ArgumentError, "instance_name must not contain dots (is #{instance_name.inspect})" 
+      end
+
+      @service_name = "#{instance_name}.#{@service}"
+      @qualified_host = "#{@hostname}.local."
       @started_callback = started_callback
       @text = text
       @started = false

@@ -94,6 +94,10 @@ module ZeroConf
       sock.send(data, 0, Addrinfo.new(to))
     end
 
+    def strip_dot_local(from_string)
+      from_string.to_s.gsub(/\.local\.?$/, "")
+    end
+
     def open_ipv6 saddr, port
       sock = UDPSocket.new Socket::AF_INET6
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)

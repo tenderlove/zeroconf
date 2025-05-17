@@ -26,6 +26,37 @@ module ZeroConf
       assert_equal [""], s.text
     end
 
+    def test_raises_when_creating_a_service_with_dot_in_the_name
+      assert_raises ArgumentError do
+        Service.new "_test-mdns._tcp.local.", 42424,
+          "some.subdomain.workstation"
+      end
+
+      assert_raises ArgumentError do
+        Service.new "_test-mdns._tcp.local.", 42424,
+          "ruby-mdns", instance_name: "ruby.test"
+      end
+    end
+
+    def test_sets_correct_service_name_from_instance_name
+      s = Service.new "_test-mdns._tcp.local.", 42424,
+        "my-rb-service", instance_name: "My RB service"
+      assert_equal "my-rb-service.local.", s.qualified_host
+      assert_equal "My RB service._test-mdns._tcp.local.", s.service_name
+    end
+
+    def test_removes_dot_local_tld_from_passed_hostname
+      s = Service.new "_test-mdns._tcp.local.", 42424,
+        "ThisMac.local"
+      assert_equal "ThisMac.local.", s.qualified_host
+      assert_equal "ThisMac._test-mdns._tcp.local.", s.service_name
+
+      s = Service.new "_test-mdns._tcp.local.", 42424,
+        "ThisMac.local."
+      assert_equal "ThisMac.local.", s.qualified_host
+      assert_equal "ThisMac._test-mdns._tcp.local.", s.service_name
+    end
+
     def test_unicast_service_instance_answer
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
