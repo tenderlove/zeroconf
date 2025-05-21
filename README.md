@@ -108,12 +108,14 @@ to run an HTTP server and simultaneously advertise the server:
 
 ```ruby
 require "zeroconf"
-require 'webrick'
+require "webrick"
 
 port = 8080
 host = "test-hostname"
 
-Thread.new { ZeroConf.service "_http._tcp.local.", port, host }
+Ractor.new(port, host) { |port, host|
+  ZeroConf.service "_http._tcp.local.", port, host
+}
 
 server = WEBrick::HTTPServer.new(:Port => port,
                                  :SSLEnable => false,
