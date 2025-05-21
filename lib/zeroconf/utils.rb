@@ -69,8 +69,8 @@ module ZeroConf
       sock
     end
 
-    BROADCAST_V4 = Addrinfo.new Socket.sockaddr_in(Resolv::MDNS::Port, Resolv::MDNS::AddressV4)
-    BROADCAST_V6 = Addrinfo.new Socket.sockaddr_in(Resolv::MDNS::Port, Resolv::MDNS::AddressV6)
+    BROADCAST_V4 = Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Resolv::MDNS::AddressV4)).freeze
+    BROADCAST_V6 = Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Resolv::MDNS::AddressV6)).freeze
 
     def multicast_send sock, query
       dest = if sock.local_address.ipv4?
