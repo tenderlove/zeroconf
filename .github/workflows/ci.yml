@@ -22,8 +22,24 @@ jobs:
       - name: Enable multicast routing (macOS)
         if: runner.os == 'macOS'
         run: |
-          IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
-          [ -n "$IFACE" ] && sudo route -q -n add -net 224.0.0.0/4 -interface "$IFACE" || true
+          # Find the same IPv4 interface that ZeroConf::Utils would select
+          IFACE=$(ruby -e "
+            require 'socket'
+            ifa = Socket.getifaddrs.find { |ifa|
+              ifa.addr&.ipv4? &&
+                (ifa.flags & Socket::IFF_UP > 0) &&
+                (ifa.flags & Socket::IFF_MULTICAST > 0) &&
+                (ifa.flags & Socket::IFF_POINTOPOINT == 0) &&
+                (ifa.flags & Socket::IFF_LOOPBACK == 0) &&
+                !ifa.addr.ip_address.start_with?('169.254')
+            }
+            puts ifa.name if ifa
+          ")
+          echo "Configuring multicast via interface: $IFACE"
+          if [ -n "$IFACE" ]; then
+            sudo route -q -n delete -net 224.0.0.0/4 2>/dev/null || true
+            sudo route -q -n add -net 224.0.0.0/4 -interface "$IFACE" || true
+          fi
 
       - name: Install dependencies
         run: bundle install

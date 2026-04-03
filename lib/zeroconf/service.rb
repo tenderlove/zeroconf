@@ -118,6 +118,11 @@ module ZeroConf
     def start
       sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port
 
+      if (mcast_if = service_interfaces.find { |ifa| ifa&.addr&.ipv4? })
+        sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF,
+                        IPAddr.new(mcast_if.addr.ip_address).hton)
+      end
+
       sockets = [sock, @rd]
 
       msg = announcement
