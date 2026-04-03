@@ -58,6 +58,7 @@ module ZeroConf
     end
 
     def test_unicast_service_instance_answer
+      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -90,6 +91,7 @@ module ZeroConf
     end
 
     def test_multicast_discover
+      skip_unless_multicast
       q = Queue.new
       rd, wr = IO.pipe
 
@@ -198,6 +200,7 @@ module ZeroConf
     end
 
     def test_dnssd_unicast_answer
+      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -234,6 +237,7 @@ module ZeroConf
     end
 
     def test_service_multicast_answer
+      skip_unless_multicast
       q = Thread::Queue.new
       rd, wr = IO.pipe
 
@@ -286,6 +290,7 @@ module ZeroConf
     end
 
     def test_service_unicast_answer
+      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -321,6 +326,7 @@ module ZeroConf
     end
 
     def test_multicast_service_instance_answer
+      skip_unless_multicast
       q = Queue.new
       rd, wr = IO.pipe
 
@@ -368,6 +374,7 @@ module ZeroConf
     end
 
     def test_unicast_name_lookup
+      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -399,6 +406,7 @@ module ZeroConf
     end
 
     def test_multicast_name
+      skip_unless_multicast
       q = Queue.new
       rd, wr = IO.pipe
 
@@ -484,6 +492,7 @@ module ZeroConf
     end
 
     def test_subtype_unicast_answer
+      skip_unless_multicast
       latch = Queue.new
       s = make_subtype_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -523,6 +532,7 @@ module ZeroConf
     end
 
     def test_subtype_multicast_answer
+      skip_unless_multicast
       q = Thread::Queue.new
       rd, wr = IO.pipe
 
@@ -567,6 +577,7 @@ module ZeroConf
     end
 
     def test_raise_on_malformed_requests
+      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, abort_on_malformed_requests: true, started_callback: -> { latch << :start }
       runner = Thread.new {
