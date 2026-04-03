@@ -117,12 +117,9 @@ module ZeroConf
 
     def start
       ipv4_iface = service_interfaces.find { |ifa| ifa&.addr&.ipv4? }
-      ipv4_saddr = if ipv4_iface
-        Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, ipv4_iface.addr.ip_address))
-      else
-        Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY))
-      end
-      sock = open_ipv4 ipv4_saddr, Resolv::MDNS::Port
+      sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)),
+                       Resolv::MDNS::Port,
+                       iface_addr: ipv4_iface&.addr
 
       sockets = [sock, @rd]
 
