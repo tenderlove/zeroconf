@@ -10,7 +10,6 @@ module ZeroConf
     end
 
     def test_resolve
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, "coolhostname", started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -35,7 +34,6 @@ module ZeroConf
     end
 
     def test_resolve_returns_early
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, "coolhostname", started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -61,7 +59,6 @@ module ZeroConf
     end
 
     def test_discover_works
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -84,7 +81,6 @@ module ZeroConf
     end
 
     def test_discover_return_early
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -107,7 +103,6 @@ module ZeroConf
     end
 
     def test_browse
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }
@@ -131,7 +126,6 @@ module ZeroConf
     end
 
     def test_browse_returns_early
-      skip_unless_multicast
       latch = Queue.new
       s = make_server iface, started_callback: -> { latch << :start }
       runner = Thread.new { s.start }

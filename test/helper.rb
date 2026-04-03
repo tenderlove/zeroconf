@@ -33,23 +33,6 @@ module ZeroConf
     HOST_NAME = "tc-lan-adapter"
     SERVICE_NAME = "#{HOST_NAME}.#{SERVICE}"
 
-    def self.multicast_works?
-      return @multicast_works if defined?(@multicast_works)
-      @multicast_works = begin
-        sock = UDPSocket.new(Socket::AF_INET)
-        sock.send("test", 0, Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Resolv::MDNS::AddressV4)))
-        true
-      rescue SystemCallError
-        false
-      ensure
-        sock&.close
-      end
-    end
-
-    def skip_unless_multicast
-      skip "multicast not available" unless self.class.multicast_works?
-    end
-
     def time_it
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       yield
