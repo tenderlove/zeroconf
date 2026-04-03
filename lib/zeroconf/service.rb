@@ -7,9 +7,10 @@ module ZeroConf
     include Utils
 
     attr_reader :service, :service_port, :hostname, :service_interfaces,
-      :service_name, :qualified_host, :text, :abort_on_malformed_requests
+      :service_name, :qualified_host, :text, :abort_on_malformed_requests,
+      :subtypes
 
-    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, instance_name: nil, text: [""], abort_on_malformed_requests: false, started_callback: nil
+    def initialize service, service_port, hostname = Socket.gethostname, service_interfaces: ZeroConf.service_interfaces, instance_name: nil, text: [""], subtypes: [], abort_on_malformed_requests: false, started_callback: nil
       @service = service
       @service_port = service_port
 
@@ -19,13 +20,14 @@ module ZeroConf
 
       instance_name ||= @hostname
       if instance_name.include?(".")
-        raise ArgumentError, "instance_name must not contain dots (is #{instance_name.inspect})" 
+        raise ArgumentError, "instance_name must not contain dots (is #{instance_name.inspect})"
       end
 
       @service_name = "#{instance_name}.#{@service}"
       @qualified_host = "#{@hostname}.local."
       @started_callback = started_callback
       @text = text
+      @subtypes = subtypes.map { |st| "#{st}._sub.#{@service}" }
       @started = false
       @rd, @wr = IO.pipe
     end
@@ -61,6 +63,11 @@ module ZeroConf
         60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
 
+      subtypes.each do |st|
+        msg.add_answer st, 60,
+          Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+      end
+
       msg
     end
 
@@ -92,6 +99,11 @@ module ZeroConf
       msg.add_answer service,
         0,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      subtypes.each do |st|
+        msg.add_answer st, 0,
+          Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+      end
 
       msg
     end
@@ -173,6 +185,12 @@ module ZeroConf
                 name_answer_unicast
               else
                 name_answer_multicast
+              end
+            when *subtypes
+              if unicast
+                subtype_unicast_answer qn
+              else
+                subtype_multicast_answer qn
               end
             else
               #p [:QUERY2, type, type::ClassValue, name]
@@ -309,6 +327,72 @@ module ZeroConf
       msg.add_answer service,
         60,
         Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      msg
+    end
+
+    def subtype_multicast_answer subtype
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional service_name, 60, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
+
+      service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional qualified_host,
+            60,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional qualified_host,
+            60,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          60,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg.add_answer subtype,
+        60,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      msg
+    end
+
+    def subtype_unicast_answer subtype
+      msg = Resolv::DNS::Message.new(0)
+      msg.qr = 1
+      msg.aa = 1
+
+      msg.add_additional service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, service_port, qualified_host)
+
+      service_interfaces.each do |iface|
+        if iface.addr.ipv4?
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+        else
+          msg.add_additional qualified_host,
+            10,
+            Resolv::DNS::Resource::IN::AAAA.new(iface.addr.ip_address)
+        end
+      end
+
+      if @text
+        msg.add_additional service_name,
+          10,
+          Resolv::DNS::Resource::IN::TXT.new(*@text)
+      end
+
+      msg.add_answer subtype,
+        10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(service_name))
+
+      msg.add_question subtype, PTR
 
       msg
     end
