@@ -54,16 +54,15 @@ module ZeroConf
   module Utils
     DISCOVERY_NAME = "_services._dns-sd._udp.local."
 
-    def open_ipv4 saddr, port, iface_addr: nil
+    def open_ipv4 saddr, port
       sock = UDPSocket.new Socket::AF_INET
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, true)
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_LOOP, true)
-      mcast_if_ip = iface_addr ? iface_addr.ip_address : saddr.ip_address
       sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP,
-                      IPAddr.new(Resolv::MDNS::AddressV4).hton + IPAddr.new(mcast_if_ip).hton)
-      sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF, IPAddr.new(mcast_if_ip).hton)
+                      IPAddr.new(Resolv::MDNS::AddressV4).hton + IPAddr.new(saddr.ip_address).hton)
+      sock.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF, IPAddr.new(saddr.ip_address).hton)
       sock.bind saddr.ip_address, port
       flags = sock.fcntl(Fcntl::F_GETFL, 0)
       sock.fcntl(Fcntl::F_SETFL, Fcntl::O_NONBLOCK | flags)
