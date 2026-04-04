@@ -47,6 +47,15 @@ module ZeroConf
         **opts
     end
 
+    def make_subtype_server iface, host = HOST_NAME, **opts
+      Service.new SERVICE + ".",
+        42424,
+        host,
+        service_interfaces: [iface], text: ["test=1", "other=value"],
+        subtypes: ["_universal"],
+        **opts
+    end
+
     def make_listener rd, q, started_callback: nil
       Thread.new do
         sock = open_ipv4 Addrinfo.new(Socket.sockaddr_in(Resolv::MDNS::Port, Socket::INADDR_ANY)), Resolv::MDNS::Port

@@ -440,6 +440,132 @@ module ZeroConf
       assert_equal expected, res
     end
 
+    def test_subtypes_expanded
+      s = Service.new "_ipp._tcp.local.", 631, "printer",
+        service_interfaces: [iface],
+        subtypes: ["_universal", "_print"]
+
+      assert_equal ["_universal._sub._ipp._tcp.local.", "_print._sub._ipp._tcp.local."], s.subtypes
+    end
+
+    def test_subtypes_default_empty
+      s = make_server iface
+      assert_equal [], s.subtypes
+    end
+
+    def test_announcement_includes_subtype_ptrs
+      s = Service.new "_test-mdns._tcp.local.", 42424,
+        "tc-lan-adapter",
+        service_interfaces: [iface],
+        subtypes: ["_universal"]
+
+      ann = s.announcement
+      subtype_ptrs = ann.answer.select { |name, ttl, data|
+        name.to_s == "_universal._sub._test-mdns._tcp.local"
+      }
+
+      assert_equal 1, subtype_ptrs.length
+      assert_equal s.service_name, subtype_ptrs.first.last.name.to_s + "."
+    end
+
+    def test_disconnect_includes_subtype_ptrs
+      s = Service.new "_test-mdns._tcp.local.", 42424,
+        "tc-lan-adapter",
+        service_interfaces: [iface],
+        subtypes: ["_universal"]
+
+      msg = s.disconnect_msg
+      subtype_ptrs = msg.answer.select { |name, ttl, data|
+        name.to_s == "_universal._sub._test-mdns._tcp.local"
+      }
+
+      assert_equal 1, subtype_ptrs.length
+      assert_equal 0, subtype_ptrs.first[1] # TTL 0 for disconnect
+    end
+
+    def test_subtype_unicast_answer
+      latch = Queue.new
+      s = make_subtype_server iface, started_callback: -> { latch << :start }
+      runner = Thread.new { s.start }
+      latch.pop
+
+      subtype = "_universal._sub._test-mdns._tcp.local."
+      query = Resolv::DNS::Message.new 0
+      query.add_question subtype, PTR
+
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+      res = Resolv::DNS::Message.decode read_with_timeout(sock).first
+      s.stop
+      runner.join
+
+      expected = Resolv::DNS::Message.new(0)
+      expected.qr = 1
+      expected.aa = 1
+
+      expected.add_additional s.service_name, 10, Resolv::DNS::Resource::IN::SRV.new(0, 0, s.service_port, s.qualified_host)
+
+      expected.add_additional s.qualified_host,
+        10,
+        Resolv::DNS::Resource::IN::A.new(iface.addr.ip_address)
+
+      expected.add_additional s.service_name,
+        10,
+        Resolv::DNS::Resource::IN::TXT.new(*s.text)
+
+      expected.add_answer subtype,
+        10,
+        Resolv::DNS::Resource::IN::PTR.new(Resolv::DNS::Name.create(s.service_name))
+
+      expected.add_question subtype, PTR
+
+      assert_equal expected, res
+    end
+
+    def test_subtype_multicast_answer
+      q = Thread::Queue.new
+      rd, wr = IO.pipe
+
+      latch = Queue.new
+      listen = make_listener rd, q, started_callback: -> { latch << :start }
+      s = make_subtype_server iface, started_callback: -> { latch << :start }
+      server = Thread.new { s.start }
+      latch.pop
+      latch.pop
+
+      subtype = "_universal._sub._test-mdns._tcp.local."
+      query = Resolv::DNS::Message.new 0
+      query.add_question subtype, Resolv::DNS::Resource::IN::PTR
+      sock = open_ipv4 iface.addr, 0
+      multicast_send sock, query.encode
+
+      subtype_name = Resolv::DNS::Name.create subtype
+      service_name = Resolv::DNS::Name.create s.service_name
+
+      while res = q.pop
+        if res.answer.find { |name, ttl, data| name == subtype_name && data.name == service_name }
+          wr.write "x"
+          break
+        end
+      end
+
+      listen.join
+      s.stop
+      server.join
+
+      # Verify the response contains the subtype PTR
+      subtype_ptr = res.answer.find { |name, ttl, data|
+        name == subtype_name && data.name == service_name
+      }
+      assert subtype_ptr, "expected subtype PTR in answer"
+
+      # Verify it has SRV in additional
+      srv = res.additional.find { |_, _, data|
+        ZeroConf::MDNS::Announce::IN::SRV == data.class
+      }
+      assert srv, "expected SRV in additional"
+    end
+
     def test_raise_on_malformed_requests
       latch = Queue.new
       s = make_server iface, abort_on_malformed_requests: true, started_callback: -> { latch << :start }
