@@ -23,18 +23,22 @@ module ZeroConf
     ::Resolv::DNS::Resource::ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
 
+  # ZeroConf::A and ZeroConf::SRV are referenced by name when constructing
+  # outgoing queries (see ZeroConf::Resolver). They share the numeric
+  # ClassValue (0x8001) with the MDNS::Announce::IN equivalents below, so
+  # only one of the two should populate Resolv's ClassHash to avoid
+  # "already initialized constant" warnings. The MDNS::Announce::IN side
+  # owns the registration.
   class A < Resolv::DNS::Resource::IN::A
     MDNS_UNICAST_RESPONSE = 0x8000
 
     ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
 
   class SRV < Resolv::DNS::Resource::IN::SRV
     MDNS_UNICAST_RESPONSE = 0x8000
 
     ClassValue = Resolv::DNS::Resource::IN::ClassValue | MDNS_UNICAST_RESPONSE
-    ClassHash[[TypeValue, ClassValue]] = self # :nodoc:
   end
 
   module MDNS
