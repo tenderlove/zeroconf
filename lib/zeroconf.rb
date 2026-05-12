@@ -46,7 +46,7 @@ module ZeroConf
       port = nil
       ipv4 = []
       ipv6 = []
-      r.additional.each { |name, ttl, data|
+      (r.answer + r.additional).each { |name, ttl, data|
         case data
         when Resolv::DNS::Resource::IN::SRV
           host = data.target.to_s
